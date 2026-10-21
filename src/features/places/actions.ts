@@ -1,0 +1,57 @@
+// @ts-nocheck
+"use server";
+import { revalidatePath } from "next/cache";
+import { requireUser } from "@/lib/auth/current-user"; import { insforge } from "@/lib/insforge"; import { mapDbRow } from "@/lib/db/insforge"; import { formatZodError, reviewSchema } from "@/lib/validation/schemas"; import { rateLimit } from "@/lib/security/rate-limit"; import { RATES } from "@/lib/constants";
+export async function toggleSaveAction(placeId: string): Promise<{ saved: boolean }> {
+const user = await requireUser();
+const existing = await insforge
+.from("saved_places")
+.select("id")
+.eq("user_id", user.id)
+.eq("place_id", placeId)
+.maybeSingle();
+if (existing?.data) {
+const { error } = await insforge.from("saved_places").delete().eq("user_id", user.id).eq("place_id", placeId);
+if (error) throw error;
+revalidatePath("/saved");
+revalidatePath(`/places/${placeId}`);
+return { saved: false };
+} else {
+const { error } = await insforge.from("saved_places").insert({ user_id: user.id, place_id: placeId });
+if (error) throw error;
+revalidatePath("/saved");
+revalidatePath(`/places/${placeId}`);
+return { saved: true };
+} }
+export type ReviewFormState = { error?: string; success?: string };
+export async function createReviewAction(_prev: ReviewFormState, formData: FormData): Promise<ReviewFormState> {
+const user = await requireUser();
+const slug = String(formData.get("slug") ?? "");
+const placeId = String(formData.get("placeId") ?? "");
+const parsed = reviewSchema.safeParse({
+rating: formData.get("rating"),
+title: formData.get("title"),
+body: formData.get("body"),
+});
+if (!parsed.success) {
+return { error: formatZodError(parsed.error) };
+}
+const limit = rateLimit(`review:${user.id}`, RATES.postPerMinute, 60_000);
+if (!limit.ok) {
+return { error: `Too many reviews. Try again in ${limit.retryAfterSeconds}s.` };
+}
+const { data, error } = await insforge
+.from("reviews")
+.insert({
+place_id: placeId,
+author_id: user.id,
+rating: parsed.data.rating,
+title: parsed.data.title,
+body: parsed.data.body,
+status: "visible",
+})
+.select()
+.single();
+if (error) throw error;
+revalidatePath(`/places/${slug}`);
+return { success: "Thanks! Your review has been published." }; }

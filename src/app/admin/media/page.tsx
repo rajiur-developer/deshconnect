@@ -1,0 +1,41 @@
+// @ts-nocheck
+import { getDatabase } from "@/lib/db/store"; import { Badge, Card } from "@/components/ui/badge"; import { PageHeader } from "@/components/layout/page-header";
+export const metadata = { title: "Media" };
+export default async function AdminMediaPage() {
+const db = await getDatabase();
+const images = new Set<string>();
+for (const place of db.places) {
+images.add(place.image);
+place.gallery?.forEach((src) => images.add(src));
+}
+for (const institution of db.institutions) images.add(institution.image);
+for (const business of db.businesses) images.add(business.image);
+for (const news of db.news) images.add(news.image);
+return (
+<>
+<PageHeader title="Media" description="Images and other media content used across the platform." />
+<div className="grid gap-4 sm:grid-cols-3">
+<Card className="p-5">
+<p className="text-2xl font-bold text-slate-900">{images.size}</p>
+<p className="text-sm text-slate-600">Referenced images</p>
+</Card>
+<Card className="p-5">
+<p className="text-2xl font-bold text-slate-900">{db.places.reduce((sum, place) => sum + (place.gallery?.length ?? 0), 0)}</p>
+<p className="text-sm text-slate-600">Gallery images</p>
+</Card>
+<Card className="p-5">
+<p className="text-2xl font-bold text-slate-900">{db.posts.filter((post) => post.image).length}</p>
+<p className="text-sm text-slate-600">Post attachments</p>
+</Card>
+</div>
+<Card className="mt-6 p-5">
+<h2 className="font-semibold text-slate-900">Image library</h2>
+<ul className="mt-3 flex flex-wrap gap-2">
+{[...images].map((src) => (
+<li key={src} className="rounded-full bg-slate-100 px-3 py-1 text-xs text-slate-600">{src}</li>
+))}
+</ul>
+<Badge tone="amber" className="mt-4">Media management is limited in local mode</Badge>
+</Card>
+</>
+); }

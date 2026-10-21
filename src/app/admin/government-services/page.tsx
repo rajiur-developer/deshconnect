@@ -1,0 +1,50 @@
+// @ts-nocheck
+import Link from "next/link";
+import { getDatabase } from "@/lib/db/store"; import { getDirectoryLocationOptions } from "@/services/locations"; import { Badge, Card } from "@/components/ui/badge"; import { PageHeader } from "@/components/layout/page-header"; import { ServiceForm } from "@/components/admin/service-form"; import { RecordActions } from "@/components/admin/record-actions"; import { serviceCategoryLabel } from "@/components/cards/service-card"; import { formatDate } from "@/lib/utils";
+export const metadata = { title: "Government Services" };
+export default async function AdminGovernmentServicesPage() {
+const [db, options] = await Promise.all([getDatabase(), getDirectoryLocationOptions()]);
+const services = [...db.governmentServices].sort((a, b) => b.updatedAt.localeCompare(a.updatedAt));
+return (
+<>
+<PageHeader title="Government Services" description="Manage government-service information." />
+<div className="mb-8">
+<ServiceForm divisions={options.divisions} districts={options.districts} upazilas={options.upazilas} />
+</div>
+<Card className="overflow-x-auto p-0">
+<table className="min-w-full divide-y divide-slate-100 text-sm">
+<thead className="bg-slate-50 text-left text-xs uppercase tracking-wide text-slate-500">
+<tr>
+<th className="px-4 py-3">Name</th>
+<th className="px-4 py-3">Category</th>
+<th className="px-4 py-3">Address</th>
+<th className="px-4 py-3">Updated</th>
+<th className="px-4 py-3">Actions</th>
+</tr>
+</thead>
+<tbody className="divide-y divide-slate-100">
+{services.map((service) => (
+<tr key={service.id}>
+<td className="px-4 py-3">
+<Link href={`/government-services/${service.slug}`} className="font-medium text-slate-900 hover:text-brand-700">{service.name}</Link>
+</td>
+<td className="px-4 py-3 text-slate-600">{serviceCategoryLabel(service.category)}</td>
+<td className="px-4 py-3 text-slate-600">{service.officeAddress}</td>
+<td className="px-4 py-3 text-slate-500">{formatDate(service.updatedAt)}</td>
+<td className="px-4 py-3">
+<RecordActions entity="service" id={service.id} status={service.status}>
+<ServiceForm
+divisions={options.divisions}
+districts={options.districts}
+upazilas={options.upazilas}
+record={service}
+/>
+</RecordActions>
+</td>
+</tr>
+))}
+</tbody>
+</table>
+</Card>
+</>
+); }

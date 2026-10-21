@@ -1,0 +1,486 @@
+@import "tailwindcss";
+
+/* ── Typography · English: Inter ─────────────────────────────── */
+@import "@fontsource/inter/400.css";
+@import "@fontsource/inter/500.css";
+@import "@fontsource/inter/600.css";
+@import "@fontsource/inter/700.css";
+
+/* ── Typography · Bengali: Galada ─────────────────────────── */
+@import "@fontsource/galada/400.css";
+
+/* ── Typography · Bengali: Noto Sans Bengali (fallback) ─────── */
+@import "@fontsource/noto-sans-bengali/400.css";
+@import "@fontsource/noto-sans-bengali/500.css";
+@import "@fontsource/noto-sans-bengali/600.css";
+@import "@fontsource/noto-sans-bengali/700.css";
+
+@theme {
+  /* Brand greens — Deep Green #0B3D2E · Emerald #138A58 · Soft Mint #35C982 */
+  --color-brand-50: #edfbf4;
+  --color-brand-100: #d3f6e5;
+  --color-brand-200: #a9edce;
+  --color-brand-300: #76e0b4;
+  --color-brand-400: #35c982; /* Soft Mint */
+  --color-brand-500: #1fa76c;
+  --color-brand-600: #138a58; /* Emerald Green */
+  --color-brand-700: #0f6e47;
+  --color-brand-800: #0b3d2e; /* Deep Green */
+  --color-brand-900: #093024;
+  --color-brand-950: #062119;
+
+  /* Blood donation red — used only for blood-related UI */
+  --color-accent-50: #fef1f2;
+  --color-accent-100: #fce0e3;
+  --color-accent-500: #e5424f;
+  --color-accent-600: #d92d3a; /* Blood red */
+  --color-accent-700: #b32230;
+
+  /* Green-tinted neutrals · page background #F7FAF7 · text #202923 */
+  --color-slate-50: #f7faf7;
+  --color-slate-100: #edf3ee;
+  --color-slate-200: #dee7e1;
+  --color-slate-300: #c5d1c9;
+  --color-slate-400: #97a69c;
+  --color-slate-500: #66776d;
+  --color-slate-600: #526157;
+  --color-slate-700: #3e4c44;
+  --color-slate-800: #2e3a33;
+  --color-slate-900: #202923; /* Body text */
+  --color-slate-950: #141a16;
+
+  --font-sans: "Noto Sans Bengali", "Nirmala UI", "Segoe UI", sans-serif;
+}
+
+html[lang="en"] {
+  --font-sans: "Inter", ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif !important;
+}
+
+html[lang="bn"] body {
+  font-family: "Noto Sans Bengali", "Nirmala UI", "Segoe UI", sans-serif;
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+}
+
+@layer base {
+  html {
+    scroll-behavior: smooth;
+    font-optical-sizing: auto;
+  }
+
+  body {
+    @apply bg-slate-50 text-slate-900 antialiased;
+    font-family: var(--font-sans);
+  }
+
+  h1,
+  h2,
+  h3 {
+    @apply text-balance;
+  }
+
+  /* Optically tighten Latin headings; Bengali keeps its natural spacing. */
+  html:not([lang="bn"]) h1,
+  html:not([lang="bn"]) h2,
+  html:not([lang="bn"]) h3 {
+    letter-spacing: -0.02em;
+  }
+
+  a {
+    transition-property: color, background-color, border-color, opacity, transform;
+    transition-duration: 200ms;
+    transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
+  }
+}
+
+@layer components {
+  .container-x {
+    @apply mx-auto w-full max-w-7xl px-4 sm:px-6 lg:px-8;
+  }
+
+  .focus-ring {
+    @apply focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-600/70 focus-visible:ring-offset-2;
+    transition: box-shadow 200ms ease, border-color 200ms ease;
+  }
+
+  .prose-body p {
+    @apply mb-4 leading-relaxed;
+  }
+}
+
+/* ── Gradients ───────────────────────────────────────────────── */
+
+/* Hero: deep green base with an emerald glow. */
+.gradient-hero {
+  background-color: var(--color-brand-800);
+  background-image:
+    radial-gradient(1100px 520px at 50% -18%, rgba(53, 201, 130, 0.32), transparent 62%),
+    linear-gradient(135deg, #0b3d2e 0%, #10784e 48%, #138a58 100%);
+}
+
+/* Secondary band / highlighted panels. */
+.gradient-band {
+  background-image: linear-gradient(135deg, #0b3d2e 0%, #138a58 100%);
+}
+
+/* Soft mint wash for highlighted cards and empty states. */
+.gradient-wash {
+  background-image: linear-gradient(135deg, rgba(53, 201, 130, 0.14), rgba(19, 138, 88, 0.05));
+}
+
+/* Keep blood-related actions visually distinct from the site's green brand. */
+.blood-theme {
+  --color-brand-50: #fff1f2;
+  --color-brand-100: #ffe4e6;
+  --color-brand-200: #fecdd3;
+  --color-brand-300: #fda4af;
+  --color-brand-400: #fb7185;
+  --color-brand-500: #f43f5e;
+  --color-brand-600: #e11d48;
+  --color-brand-700: #be123c;
+  --color-brand-800: #9f1239;
+  --color-brand-900: #881337;
+  --color-brand-950: #4c0519;
+  background:
+    radial-gradient(ellipse at 8% 8%, rgba(251, 113, 133, 0.08), transparent 34%),
+    #fffafa;
+}
+
+.blood-theme > div:first-child {
+  border-color: #fecdd3;
+  background-image: linear-gradient(115deg, #fff1f2 0%, #fff 60%, #fff7f7 100%);
+}
+
+.blood-theme .bg-brand-600.text-white,
+.blood-theme .btn-grad {
+  background-image: linear-gradient(135deg, #e11d48 0%, #be123c 52%, #881337 100%);
+}
+
+.blood-theme .bg-brand-600.text-white:hover,
+.blood-theme .btn-grad:hover {
+  box-shadow: 0 10px 22px -12px rgba(190, 18, 60, 0.8);
+}
+
+.blood-nav-link {
+  position: relative;
+}
+
+.blood-nav-link::after {
+  position: absolute;
+  right: 0.75rem;
+  bottom: 0.25rem;
+  left: 0.75rem;
+  height: 2px;
+  border-radius: 999px;
+  background: currentColor;
+  content: "";
+  transform: scaleX(0);
+  transform-origin: left;
+  transition: transform 180ms ease;
+}
+
+.blood-nav-link:hover::after,
+.blood-nav-link:focus-visible::after {
+  transform: scaleX(1);
+}
+
+.blood-category-card {
+  background-image: linear-gradient(145deg, #fff 55%, #fff1f2 100%);
+}
+
+.page-theme[data-page-theme="explore"] {
+  --color-brand-50: #ecfeff;
+  --color-brand-100: #cffafe;
+  --color-brand-200: #a5f3fc;
+  --color-brand-300: #67e8f9;
+  --color-brand-400: #22d3ee;
+  --color-brand-500: #06b6d4;
+  --color-brand-600: #0891b2;
+  --color-brand-700: #0e7490;
+  --color-brand-800: #155e75;
+  --color-brand-900: #164e63;
+  --color-brand-950: #083344;
+}
+
+.page-theme[data-page-theme="education"] {
+  --color-brand-50: #eef2ff;
+  --color-brand-100: #e0e7ff;
+  --color-brand-200: #c7d2fe;
+  --color-brand-300: #a5b4fc;
+  --color-brand-400: #818cf8;
+  --color-brand-500: #6366f1;
+  --color-brand-600: #4f46e5;
+  --color-brand-700: #4338ca;
+  --color-brand-800: #3730a3;
+  --color-brand-900: #312e81;
+  --color-brand-950: #1e1b4b;
+}
+
+.page-theme[data-page-theme="health"] {
+  --color-brand-50: #ecfeff;
+  --color-brand-100: #cffafe;
+  --color-brand-200: #a5f3fc;
+  --color-brand-300: #67e8f9;
+  --color-brand-400: #22d3ee;
+  --color-brand-500: #06b6d4;
+  --color-brand-600: #0891b2;
+  --color-brand-700: #0e7490;
+  --color-brand-800: #155e75;
+  --color-brand-900: #164e63;
+  --color-brand-950: #083344;
+}
+
+.page-theme[data-page-theme="business"] {
+  --color-brand-50: #fffbeb;
+  --color-brand-100: #fef3c7;
+  --color-brand-200: #fde68a;
+  --color-brand-300: #fcd34d;
+  --color-brand-400: #fbbf24;
+  --color-brand-500: #f59e0b;
+  --color-brand-600: #d97706;
+  --color-brand-700: #b45309;
+  --color-brand-800: #92400e;
+  --color-brand-900: #78350f;
+  --color-brand-950: #451a03;
+}
+
+.page-theme[data-page-theme="government"] {
+  --color-brand-50: #eff6ff;
+  --color-brand-100: #dbeafe;
+  --color-brand-200: #bfdbfe;
+  --color-brand-300: #93c5fd;
+  --color-brand-400: #60a5fa;
+  --color-brand-500: #3b82f6;
+  --color-brand-600: #2563eb;
+  --color-brand-700: #1d4ed8;
+  --color-brand-800: #1e40af;
+  --color-brand-900: #1e3a8a;
+  --color-brand-950: #172554;
+}
+
+.page-theme[data-page-theme="community"] {
+  --color-brand-50: #f5f3ff;
+  --color-brand-100: #ede9fe;
+  --color-brand-200: #ddd6fe;
+  --color-brand-300: #c4b5fd;
+  --color-brand-400: #a78bfa;
+  --color-brand-500: #8b5cf6;
+  --color-brand-600: #7c3aed;
+  --color-brand-700: #6d28d9;
+  --color-brand-800: #5b21b6;
+  --color-brand-900: #4c1d95;
+  --color-brand-950: #2e1065;
+}
+
+.page-theme[data-page-theme="news"] {
+  --color-brand-50: #eff6ff;
+  --color-brand-100: #dbeafe;
+  --color-brand-200: #bfdbfe;
+  --color-brand-300: #93c5fd;
+  --color-brand-400: #60a5fa;
+  --color-brand-500: #3b82f6;
+  --color-brand-600: #2563eb;
+  --color-brand-700: #1d4ed8;
+  --color-brand-800: #1e40af;
+  --color-brand-900: #1e3a8a;
+  --color-brand-950: #172554;
+}
+
+/* ── Buttons ─────────────────────────────────────────────────── */
+
+/* Any solid emerald action surface renders as a green gradient, so every
+   primary button picks this up without per-component edits. */
+.bg-brand-600.text-white {
+  background-image: linear-gradient(135deg, #138a58 0%, #0f6e47 48%, #0b3d2e 100%);
+  background-size: 165% 165%;
+  background-position: 0% 50%;
+  transition-property: color, background-color, border-color, opacity, transform, box-shadow,
+    background-position, filter;
+  transition-duration: 220ms;
+  transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.bg-brand-600.text-white:hover {
+  background-position: 100% 50%;
+  filter: brightness(1.1);
+  box-shadow: 0 8px 18px -10px rgba(11, 61, 46, 0.85);
+}
+
+/* Single transition source so gradient shifts stay on the compositor. */
+.btn-motion {
+  transition-property: color, background-color, border-color, box-shadow, transform, filter,
+    background-position;
+  transition-duration: 220ms;
+  transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.btn-grad {
+  background-image: linear-gradient(135deg, #138a58 0%, #0f6e47 48%, #0b3d2e 100%);
+  background-size: 165% 165%;
+  background-position: 0% 50%;
+}
+
+.btn-grad-accent {
+  background-image: linear-gradient(135deg, #d92d3a 0%, #b32230 100%);
+}
+
+.btn-grad:hover,
+.btn-grad-accent:hover {
+  background-position: 100% 50%;
+  transform: translateY(-1px);
+}
+
+.btn-grad:active,
+.btn-grad-accent:active {
+  transform: translateY(0);
+}
+
+.btn-grad:hover {
+  box-shadow: 0 10px 22px -12px rgba(11, 61, 46, 0.75);
+}
+
+.btn-grad-accent:hover {
+  box-shadow: 0 10px 22px -12px rgba(217, 45, 58, 0.7);
+}
+
+/* ── Animations ──────────────────────────────────────────────── */
+
+@keyframes fade-in-up {
+  from {
+    opacity: 0;
+    transform: translate3d(0, 14px, 0);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@keyframes dropdown-in {
+  from {
+    opacity: 0;
+    transform: translate3d(0, -6px, 0) scale(0.985);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@keyframes shimmer-sweep {
+  from {
+    transform: translateX(-100%);
+  }
+  to {
+    transform: translateX(100%);
+  }
+}
+
+/* Initial paint: hero and top-of-page content settle in. */
+.enter-fade {
+  animation: fade-in-up 0.6s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+.enter-fade-2 {
+  animation: fade-in-up 0.6s cubic-bezier(0.16, 1, 0.3, 1) 0.12s both;
+}
+
+.page-enter {
+  animation: fade-in-up 0.42s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+/* Dropdown / sub-menu entrance. */
+.dropdown-in {
+  animation: dropdown-in 0.16s cubic-bezier(0.16, 1, 0.3, 1) both;
+  transform-origin: top center;
+}
+
+/* Keep the account disclosure operable before client-side hydration too. */
+.user-menu-panel {
+  visibility: hidden;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 150ms ease, visibility 150ms ease;
+}
+
+.user-menu-details[open] > .user-menu-panel {
+  visibility: visible;
+  opacity: 1;
+  pointer-events: auto;
+}
+
+.user-menu-details[open] > summary svg {
+  transform: rotate(180deg);
+}
+
+/* Scroll-triggered reveal. Progressive enhancement: only browsers that
+   support scroll-driven animations opt in, so content is never hidden
+   where the effect cannot run. */
+@media (prefers-reduced-motion: no-preference) {
+  @supports (animation-timeline: view()) {
+    main section {
+      animation: fade-in-up linear both;
+      animation-timeline: view();
+      animation-range: entry 0% cover 30%;
+    }
+  }
+}
+
+/* Skeleton shimmer — transform-only, GPU friendly. */
+.skeleton-shimmer {
+  position: relative;
+  overflow: hidden;
+  isolation: isolate;
+}
+
+.skeleton-shimmer::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background-image: linear-gradient(
+    90deg,
+    transparent 0%,
+    rgba(255, 255, 255, 0.72) 45%,
+    transparent 90%
+  );
+  transform: translateX(-100%);
+  animation: shimmer-sweep 1.5s ease-in-out infinite;
+  pointer-events: none;
+}
+
+/* ── Accessibility: honour reduced-motion everywhere ─────────── */
+@media (prefers-reduced-motion: reduce) {
+  html {
+    scroll-behavior: auto;
+  }
+
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    transition-delay: 0ms !important;
+  }
+
+  /* No hover travel, no zoom, no gradient drift — static states only. */
+  .btn-grad:hover,
+  .btn-grad-accent:hover,
+  .btn-motion:hover,
+  .btn-motion:active {
+    transform: none;
+  }
+
+  .group:hover img {
+    transform: none;
+  }
+}
+
+/* Line-clamp is built into Tailwind v4; keep a fallback for older browsers. */
+.line-clamp-2 {
+  display: -webkit-box;
+  line-clamp: 2;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
