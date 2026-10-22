@@ -121,7 +121,7 @@ action={user?.id === request.requesterId ? (
 {donorProfile ? "Update your donor profile and availability." : "Register as a voluntary blood donor."}
 </p>
 <div className="mt-4">
-<DonorForm divisions={options.divisions} districts={options.districts} upazilas={options.upazilas} />
+<DonorForm divisions={options.divisions} districts={options.districts} upazilas={options.upazilas} profile={donorProfile} />
 </div>
 </div>
 <div className="rounded-2xl border border-slate-200 bg-white p-5">

@@ -2,6 +2,7 @@
 "use client";
 import Link from "next/link"; import { useActionState } from "react";
 import { googleOAuthAction, registerAction, resendRegistrationCodeAction, verifyRegistrationAction, type FormState } from "@/features/auth/actions"; import { BLOOD_GROUPS, GENDERS } from "@/lib/constants"; import { Button } from "@/components/ui/button"; import { Field, Input } from "@/components/ui/input"; import { LocationFields } from "@/components/forms/location-fields"; import { useFormStateToast } from "@/components/ui/toast"; import type { DistrictOption, LocationOption, UpazilaOption } from "@/components/search/directory-filters";
+import { Spinner } from "@/components/ui/spinner"; import { FormPendingButton } from "@/components/ui/form-pending-button";
 type Props = {
 divisions: LocationOption[];
 districts: DistrictOption[];
@@ -22,8 +23,8 @@ return <div><form action={verifyAction} className="rounded-2xl border border-sla
 <input type="hidden" name="email" value={state.email ?? ""} />
 {fields.map((key) => <input key={key} type="hidden" name={key} value={state[key] ?? ""} />)}
 <div className="mt-6"><Field label="Verification code" htmlFor="otp" required><Input id="otp" name="otp" inputMode="numeric" autoComplete="one-time-code" pattern="[0-9]{6}" maxLength={6} required placeholder="123456" /></Field></div>
-{verifyState.error && <p role="alert" className="mt-4 rounded-lg bg-accent-500/10 px-3 py-2 text-sm text-accent-600">{verifyState.error}</p>}
-<div className="mt-6"><Button type="submit" className="w-full" disabled={verifyPending}>{verifyPending ? "Verifying…" : "Verify email"}</Button></div>
+{verifyState.error && <p role="alert" className="motion-error mt-4 rounded-lg bg-accent-500/10 px-3 py-2 text-sm text-accent-600">{verifyState.error}</p>}
+<div className="mt-6"><Button type="submit" className="w-full" disabled={verifyPending} aria-busy={verifyPending}>{verifyPending && <Spinner />}{verifyPending ? "Verifying…" : "Verify email"}</Button></div>
 <p className="mt-4 text-center text-sm text-slate-600"><Link href="/login" className="text-brand-700">Return to login</Link></p>
 </form><form action={resendAction} className="mt-3 text-center">
 <input type="hidden" name="email" value={state.email ?? ""} />
@@ -90,14 +91,14 @@ I agree to the <Link href="/terms" className="text-brand-700">Terms of Use</Link
 </span>
 </label>
 </div>
-{state.error && <p role="alert" className="mt-4 rounded-lg bg-accent-500/10 px-3 py-2 text-sm text-accent-600">{state.error}</p>}
+{state.error && <p role="alert" className="motion-error mt-4 rounded-lg bg-accent-500/10 px-3 py-2 text-sm text-accent-600">{state.error}</p>}
 <div className="mt-6">
-<Button type="submit" className="w-full" disabled={pending}>{pending ? "Creating account…" : "Create account"}</Button>
+<Button type="submit" className="w-full" disabled={pending} aria-busy={pending}>{pending && <Spinner />}{pending ? "Creating account…" : "Create account"}</Button>
 </div>
 <p className="mt-4 text-center text-sm text-slate-600">
 Already have an account? <Link href="/login" className="text-brand-700">Log in</Link>
 </p>
 </form>
 <div className="my-4 flex items-center gap-3 text-xs text-slate-400"><span className="h-px flex-1 bg-slate-200" />or sign up with<span className="h-px flex-1 bg-slate-200" /></div>
-<form action={googleOAuthAction}><Button type="submit" variant="outline" className="w-full">Continue with Google</Button></form>
+<form action={googleOAuthAction}><FormPendingButton variant="outline" className="w-full" pendingLabel="Connecting to Google…">Continue with Google</FormPendingButton></form>
 </div>); }

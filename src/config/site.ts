@@ -9,11 +9,15 @@ items: NavItem[]; }
 export type NavEntry = NavItem | NavGroup;
 export function isNavGroup(entry: NavEntry): entry is NavGroup {
 return "items" in entry; }
+export function isNavPathActive(pathname: string, href: string): boolean {
+const path = href.split("?")[0];
+return path === "/" ? pathname === "/" : pathname === path || pathname.startsWith(`${path}/`);
+}
 export const SITE = {
 name: "DeshConnect",
-tagline: "Bangladesh's places, services and people — all in one place.",
+tagline: "Bangladesh's places, Blood Find, Services and people all in one place.",
 description:
-"DeshConnect is an information and community platform for finding tourist spots, educational institutions, hospitals, businesses, government services, blood donors, news and local activity across Bangladesh.",
+"DeshConnect is an Information and Community platform for finding Tourist Spots,Blood donors, Educational institutions, Hospitals, Businesses, Government services, News and local activity across Bangladesh.",
 get url() {
 return process.env.NEXT_PUBLIC_SITE_URL ?? "http://localhost:3000";
 },
@@ -32,6 +36,7 @@ items: [
 ],
 },
 { label: "Blood Donation", href: "/blood-donation", description: "Find donors and post a request" },
+{ label: "Messages", href: "/messages", description: "Message your connections" },
 {
 label: "Community",
 items: [

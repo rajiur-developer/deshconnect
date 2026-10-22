@@ -2,6 +2,7 @@
 "use client";
 import Link from "next/link"; import { useActionState } from "react";
 import { resetPasswordAction, type FormState } from "@/features/auth/actions"; import { Button } from "@/components/ui/button"; import { Field, Input } from "@/components/ui/input"; import { useFormStateToast } from "@/components/ui/toast";
+import { Spinner } from "@/components/ui/spinner";
 export function ResetPasswordForm({ email }: { email: string }) {
 const [state, formAction, pending] = useActionState<FormState, FormData>(resetPasswordAction, {});
 useFormStateToast(state);
@@ -19,10 +20,10 @@ return (
 <Input id="confirmPassword" name="confirmPassword" type="password" autoComplete="new-password" required />
 </Field>
 </div>
-{state.error && <p role="alert" className="mt-4 text-sm text-accent-600">{state.error}</p>}
-{state.success && <p role="status" className="mt-4 text-sm text-emerald-600">{state.success}</p>}
+{state.error && <p role="alert" className="motion-error mt-4 text-sm text-accent-600">{state.error}</p>}
+{state.success && <p role="status" className="motion-success mt-4 text-sm text-emerald-600">{state.success}</p>}
 <div className="mt-6">
-<Button type="submit" className="w-full" disabled={pending}>{pending ? "Updating…" : "Update password"}</Button>
+<Button type="submit" className="w-full" disabled={pending} aria-busy={pending}>{pending && <Spinner />}{pending ? "Updating…" : "Update password"}</Button>
 </div>
 <p className="mt-4 text-center text-sm text-slate-600">
 <Link href="/login" className="text-brand-700">Back to login</Link>

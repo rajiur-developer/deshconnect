@@ -1,8 +1,9 @@
 // @ts-nocheck
 "use client";
 import { useActionState, useEffect, useRef, useState, type FormEvent } from "react";
-import { createBrowserClient } from "@insforge/sdk/ssr";
+import { getInsForgeBrowserClient } from "@/lib/insforge-browser";
 import { sendMessageAction, updateProfileAction, type AccountFormState } from "@/features/account/actions"; import { PROFILE_IMAGE_BUCKET, PROFILE_IMAGE_MAX_BYTES, PROFILE_IMAGE_TYPES } from "@/features/account/constants"; import { Button } from "@/components/ui/button"; import { Field, Input, Textarea } from "@/components/ui/input"; import { LocationFields } from "@/components/forms/location-fields"; import { useFormStateToast } from "@/components/ui/toast"; import type { DistrictOption, LocationOption, UpazilaOption } from "@/components/search/directory-filters";
+import { Spinner } from "@/components/ui/spinner";
 type LocationProps = {
 divisions: LocationOption[];
 districts: DistrictOption[];
@@ -46,7 +47,7 @@ if (file.size < 1 || file.size > PROFILE_IMAGE_MAX_BYTES) { setUploadError("The 
 uploadInProgress.current = true;
 setUploading(true);
 try {
-const client = createBrowserClient();
+const client = getInsForgeBrowserClient();
 const key = `${userId}/${crypto.randomUUID()}-${safeFilename(file.name)}`;
 const { data, error } = await client.storage.from(PROFILE_IMAGE_BUCKET).upload(key, file);
 if (error || !data?.url || !data?.key) { setUploadError("Image upload failed. Please try again."); return; }
@@ -101,12 +102,13 @@ upazilaId: initial.upazilaId,
 <Button type="submit" disabled={pending || uploading}>{uploading ? "Uploading…" : pending ? "Saving…" : "Save changes"}</Button>
 </form>
 ); }
-export function MessageForm({ conversationId, viewerId }: { conversationId: string; viewerId: string }) {
+export function MessageForm({ conversationId, viewerId, onMessageSent }: { conversationId: string; viewerId: string; onMessageSent?: (message: { id: string; conversationId: string; senderId: string; body: string; attachmentKey: string | null; attachmentUrl: string | null; attachmentMimeType: string | null; attachmentType: "image" | "audio" | null; createdAt: string; readBy: string[] }) => void }) {
 const [body, setBody] = useState("");
 const [file, setFile] = useState<File | null>(null);
 const [pending, setPending] = useState(false);
 const [recording, setRecording] = useState(false);
 const [error, setError] = useState("");
+const [replyingTo, setReplyingTo] = useState<{ messageId: string; senderName: string; body: string } | null>(null);
 const imageRef = useRef<HTMLInputElement>(null);
 const audioRef = useRef<HTMLInputElement>(null);
 const recorderRef = useRef<MediaRecorder | null>(null);
@@ -117,6 +119,17 @@ const recorder = recorderRef.current;
 if (recorder && recorder.state !== "inactive") { recorder.onstop = null; recorder.stop(); }
 streamRef.current?.getTracks().forEach((track) => track.stop());
 }, []);
+useEffect(() => {
+const handleReply = (event: Event) => {
+const detail = (event as CustomEvent<{ conversationId: string; messageId: string; senderName: string; body: string }>).detail;
+if (detail?.conversationId !== conversationId) return;
+setReplyingTo({ messageId: detail.messageId, senderName: detail.senderName, body: detail.body });
+setBody("");
+setError("");
+};
+window.addEventListener("chat-reply-requested", handleReply);
+return () => window.removeEventListener("chat-reply-requested", handleReply);
+}, [conversationId]);
 async function toggleVoiceRecording() {
 setError("");
 if (recording) { recorderRef.current?.stop(); return; }
@@ -147,50 +160,75 @@ if (audioRef.current) audioRef.current.value = "";
 }
 async function submitMessage(event: FormEvent<HTMLFormElement>) {
 event.preventDefault();
+if (pending) return;
 if (!body.trim() && !file) return;
+const messageBody = body.trim();
+const selectedFile = file;
+const replyToMessageId = replyingTo?.messageId ?? null;
+const optimisticId = crypto.randomUUID();
+const optimisticMime = selectedFile?.type.toLowerCase().split(";")[0] ?? "";
+const optimisticType = optimisticMime.startsWith("image/") ? "image" : optimisticMime.startsWith("audio/") ? "audio" : null;
+window.dispatchEvent(new CustomEvent("chat-message-optimistic", { detail: {
+id: optimisticId, conversationId, senderId: viewerId, body: messageBody, readBy: [viewerId], deliveredTo: [],
+attachmentKey: null, attachmentUrl: null, attachmentMimeType: optimisticMime || null, attachmentType: optimisticType,
+replyToMessageId, reactions: [], createdAt: new Date().toISOString(), deliveryState: "sending",
+optimisticAttachmentType: optimisticType,
+} }));
+setBody("");
+setFile(null);
+setReplyingTo(null);
+if (imageRef.current) imageRef.current.value = "";
+if (audioRef.current) audioRef.current.value = "";
 setPending(true); setError("");
 let uploadedKey: string | undefined;
 try {
 let attachment: { key: string; url: string; mimeType: string; type: "image" | "audio" } | undefined;
-if (file) {
-if (file.size < 1 || file.size > MAX_CHAT_MEDIA_BYTES) throw new Error("Images and voice messages must be 5 MB or smaller.");
-const mimeType = file.type.toLowerCase().split(";")[0];
+if (selectedFile) {
+if (selectedFile.size < 1 || selectedFile.size > MAX_CHAT_MEDIA_BYTES) throw new Error("Images and voice messages must be 5 MB or smaller.");
+const mimeType = selectedFile.type.toLowerCase().split(";")[0];
 const type = mimeType.startsWith("image/") ? "image" : mimeType.startsWith("audio/") ? "audio" : null;
 const allowed = new Set(["image/jpeg", "image/png", "image/webp", "audio/webm", "audio/mp4", "audio/mpeg", "audio/ogg", "audio/wav", "audio/aac", "audio/x-wav"]);
 if (!type || !allowed.has(mimeType)) throw new Error("Choose an image or audio recording. Other file types are not supported.");
-const extension = file.name.split(".").pop()?.toLowerCase() || (type === "image" ? "jpg" : "webm");
+const extension = selectedFile.name.split(".").pop()?.toLowerCase() || (type === "image" ? "jpg" : "webm");
 const key = `${viewerId}/${conversationId}/${crypto.randomUUID()}.${extension}`;
-const client = createBrowserClient();
-const { data: upload, error: uploadError } = await client.storage.from("chat-media").upload(key, file);
+const client = getInsForgeBrowserClient();
+const { data: upload, error: uploadError } = await client.storage.from("chat-media").upload(key, selectedFile);
 if (uploadError) throw new Error(uploadError.message || "The attachment could not be uploaded. Check your connection and try again.");
 uploadedKey = key;
 if (!upload?.url) throw new Error("The attachment uploaded, but its link could not be saved. Please try again.");
 attachment = { key, url: upload.url, mimeType, type };
 }
-const result = await sendMessageAction(conversationId, body, attachment);
+const result = await sendMessageAction(conversationId, messageBody, attachment, replyToMessageId);
 if (!result.ok) {
-if (uploadedKey) await createBrowserClient().storage.from("chat-media").remove(uploadedKey);
+if (uploadedKey) await getInsForgeBrowserClient().storage.from("chat-media").remove(uploadedKey);
 uploadedKey = undefined;
 throw new Error(result.error || "The message could not be sent.");
 }
 uploadedKey = undefined;
-setBody(""); setFile(null);
-if (imageRef.current) imageRef.current.value = "";
-if (audioRef.current) audioRef.current.value = "";
+if (!result.message) throw new Error("The message was sent, but its delivery status could not be confirmed.");
+onMessageSent?.(result.message);
+window.dispatchEvent(new CustomEvent("chat-message-sent", { detail: { ...result.message, clientMessageId: optimisticId } }));
+uploadedKey = undefined;
 } catch (cause) {
-if (uploadedKey) await createBrowserClient().storage.from("chat-media").remove(uploadedKey);
-setError(cause instanceof Error ? cause.message : "The message could not be sent. Please try again.");
+if (uploadedKey) await getInsForgeBrowserClient().storage.from("chat-media").remove(uploadedKey);
+const message = cause instanceof Error ? cause.message : "The message could not be sent. Please try again.";
+window.dispatchEvent(new CustomEvent("chat-message-send-failed", { detail: { id: optimisticId, conversationId } }));
+setBody((current) => current || messageBody);
+if (selectedFile) setFile(selectedFile);
+if (replyToMessageId && replyingTo) setReplyingTo(replyingTo);
+setError(message);
 } finally { setPending(false); }
 }
 return (
-<form onSubmit={submitMessage} className="space-y-2">
+<form onSubmit={submitMessage} className={`space-y-2 rounded-lg ${error ? "motion-error" : ""}`}>
+{replyingTo && <div className="flex items-start justify-between gap-3 rounded-lg border-l-2 border-brand-500 bg-brand-50 px-3 py-2 text-xs text-slate-600"><p className="min-w-0"><span className="font-semibold text-slate-800">Replying to {replyingTo.senderName}</span><br /><span className="block truncate">{replyingTo.body}</span></p><button type="button" onClick={() => setReplyingTo(null)} className="shrink-0 text-slate-500 underline">Cancel</button></div>}
 <div className="flex gap-2">
-<Input value={body} onChange={(event) => setBody(event.target.value)} placeholder="Write a message…" aria-label="Message" className="flex-1" maxLength={2000} />
-<Button type="submit" disabled={pending || (!body.trim() && !file)}>{pending ? "Sending…" : "Send"}</Button>
+<Input value={body} onChange={(event) => setBody(event.target.value)} placeholder="Write a message…" aria-label="Message" className="flex-1" maxLength={2000} disabled={pending} />
+<Button type="submit" disabled={pending || (!body.trim() && !file)} aria-busy={pending}>{pending && <Spinner />}{pending ? "Sending…" : "Send"}</Button>
 </div>
 <div className="flex flex-wrap items-center gap-3 text-xs text-slate-600">
-<label className="cursor-pointer hover:text-brand-700">Image<input ref={imageRef} type="file" accept="image/jpeg,image/png,image/webp" className="sr-only" onChange={(event) => { const selected = event.target.files?.[0] ?? null; setFile(selected); if (selected && audioRef.current) audioRef.current.value = ""; }} /></label>
-<label className="cursor-pointer hover:text-brand-700">Choose voice<input ref={audioRef} type="file" accept="audio/*" className="sr-only" onChange={(event) => { const selected = event.target.files?.[0] ?? null; setFile(selected); if (selected && imageRef.current) imageRef.current.value = ""; }} /></label>
+<label className={`cursor-pointer hover:text-brand-700 ${pending ? "pointer-events-none opacity-60" : ""}`}>Image<input ref={imageRef} type="file" accept="image/jpeg,image/png,image/webp" className="sr-only" disabled={pending} onChange={(event) => { const selected = event.target.files?.[0] ?? null; setFile(selected); if (selected && audioRef.current) audioRef.current.value = ""; }} /></label>
+<label className={`cursor-pointer hover:text-brand-700 ${pending ? "pointer-events-none opacity-60" : ""}`}>Choose voice<input ref={audioRef} type="file" accept="audio/*" className="sr-only" disabled={pending} onChange={(event) => { const selected = event.target.files?.[0] ?? null; setFile(selected); if (selected && imageRef.current) imageRef.current.value = ""; }} /></label>
 <button type="button" onClick={toggleVoiceRecording} disabled={pending} className="font-medium text-brand-700 hover:text-brand-900 disabled:opacity-60">{recording ? "Stop recording" : "Record voice"}</button>
 {file && <span className="max-w-48 truncate text-slate-500">{file.name}</span>}
 <span className="text-slate-400">Image or voice · max 5 MB</span>

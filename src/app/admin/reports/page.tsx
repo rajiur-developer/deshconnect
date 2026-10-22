@@ -1,5 +1,5 @@
 // @ts-nocheck
-import { getDatabase } from "@/lib/db/store"; import { Badge, Card } from "@/components/ui/badge"; import { PageHeader } from "@/components/layout/page-header"; import { ReportResolveButtons } from "@/components/admin/admin-client"; import { relativeTime } from "@/lib/utils";
+import { listAdminReports } from "@/services/community"; import { Badge, Card } from "@/components/ui/badge"; import { PageHeader } from "@/components/layout/page-header"; import { ReportResolveButtons } from "@/components/admin/admin-client"; import { relativeTime } from "@/lib/utils";
 export const metadata = { title: "Reports" };
 const TONE: Record<string, "accent" | "info" | "success" | "neutral"> = {
 open: "accent",
@@ -7,8 +7,7 @@ under_review: "info",
 resolved: "success",
 dismissed: "neutral", };
 export default async function AdminReportsPage() {
-const db = await getDatabase();
-const reports = [...db.reports].sort((a, b) => b.createdAt.localeCompare(a.createdAt));
+const reports = await listAdminReports();
 return (
 <>
 <PageHeader title="Reports" description="Review user-submitted reports and take action." />

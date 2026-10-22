@@ -7,7 +7,7 @@ markAllNotificationsReadAction,
 markNotificationReadAction,
 requestConnectionAction,
 respondConnectionAction,
-startConversationAction, } from "@/features/account/actions";
+} from "@/features/account/actions";
 export function ConnectButton({ username, pendingConnectionId }: { username: string; pendingConnectionId?: string }) {
 const [state, setState] = useState<"idle" | "sent">("idle");
 const [error, setError] = useState("");
@@ -106,9 +106,7 @@ disabled={pending}
 onClick={() =>
 startTransition(async () => {
 setError("");
-const result = await startConversationAction(username);
-if (result.ok && result.conversationId) router.push(`/messages/${result.conversationId}`);
-else setError(result.error ?? "Could not open chat.");
+router.push(`/messages?to=${encodeURIComponent(username)}`);
 })
 }
 className="rounded-lg border border-slate-300 px-3 py-1.5 text-xs font-medium text-slate-700 hover:bg-slate-50"

@@ -1,7 +1,7 @@
 // @ts-nocheck
 import "server-only";
 
-import { insforgeGet, insforgeInsert, insforgeUpdate, insforgeDelete, insforgeSelectOne, insforgeSelectMany } from "@/lib/insforge";
+import { insforgeGet, insforgeInsert, insforgeUpdate, insforgeDelete, insforgeDeleteWhere, insforgeSelectOne, insforgeSelectMany } from "@/lib/insforge";
 import { addTextSearch, makePageMeta } from "@/lib/insforge-query";
 
 export async function insforgeListPlaces(query: {
@@ -114,7 +114,7 @@ export async function insforgeIsPlaceSaved(userId: string, placeId: string) {
 export async function insforgeToggleSavePlace(userId: string, placeId: string) {
   const existing = await insforgeIsPlaceSaved(userId, placeId);
   if (existing) {
-    await insforgeDelete("saved_places", `${userId}:${placeId}`);
+    await insforgeDeleteWhere("saved_places", { user_id: `eq.${userId}`, place_id: `eq.${placeId}` });
     return { saved: false };
   } else {
     await insforgeInsert("saved_places", { user_id: userId, place_id: placeId });

@@ -1,7 +1,7 @@
 // @ts-nocheck
 "use server";
 import { revalidatePath } from "next/cache";
-import { requireUser } from "@/lib/auth/current-user"; import { can, rolePermissions } from "@/lib/auth/permissions"; import { ALL_ACTIONS, type PermissionAction } from "@/config/permissions"; import { getDatabase, saveDatabase } from "@/lib/db/store"; import { setNewsStatus } from "@/services/news"; import { setPostStatus, setReportStatus, setReviewStatus } from "@/services/community"; import { setUserRole, setUserStatus } from "@/services/users"; import { setBloodRequestStatus } from "@/services/blood"; import { recordAudit } from "@/services/audit"; import { createId, slugify } from "@/lib/utils"; import { formatZodError, emergencyAlertSchema, businessSchema, locationSchema, placeSchema, serviceSchema, staffNewsSchema } from "@/lib/validation/schemas"; import { sanitizeMultiline, sanitizeText } from "@/lib/security/sanitize"; import type { Business, GovernmentService, News, Place } from "@/types/content"; import type { Role } from "@/types/auth";
+import { requireUser } from "@/lib/auth/current-user"; import { can, rolePermissions } from "@/lib/auth/permissions"; import { ALL_ACTIONS, type PermissionAction } from "@/config/permissions"; import { setNewsStatus } from "@/services/news"; import { setPostStatus, setReportStatus, setReviewStatus } from "@/services/community"; import { setUserRole, setUserStatus } from "@/services/users"; import { setBloodRequestStatus } from "@/services/blood"; import { recordAudit } from "@/services/audit"; import { createId, slugify } from "@/lib/utils"; import { formatZodError, emergencyAlertSchema, businessSchema, locationSchema, placeSchema, serviceSchema, staffNewsSchema } from "@/lib/validation/schemas"; import { sanitizeMultiline, sanitizeText } from "@/lib/security/sanitize"; import type { Business, GovernmentService, News, Place } from "@/types/content"; import type { Role } from "@/types/auth";
 import { cookies } from "next/headers";
 import { createServerClient } from "@insforge/sdk/ssr";
 import { getRolePermissionOverrides, saveRolePermissionOverrides } from "@/services/role-permissions";
@@ -15,6 +15,18 @@ throw new Error("You do not have permission to perform this action.");
 return user; }
 async function audit(user: { id: string; fullName: string }, action: string, entity: string, entityId: string, outcome: "success" | "denied" = "success", detail?: string) {
 await recordAudit({ actorId: user.id, actorName: user.fullName, action, entity, entityId, outcome, detail }); }
+async function deleteAdminRow(table: string, id: string) {
+const client = createServerClient({ cookies: await cookies() });
+const { data, error } = await client.database.from(table).delete().eq("id", id).select("id").maybeSingle();
+if (error) throw error;
+return data;
+}
+async function updateAdminRow(table: string, id: string, values: Record<string, unknown>) {
+const client = createServerClient({ cookies: await cookies() });
+const { data, error } = await client.database.from(table).update({ ...values, updated_at: new Date().toISOString() }).eq("id", id).select("id").maybeSingle();
+if (error) throw error;
+return data;
+}
 export async function adminSetNewsStatusAction(id: string, status: "pending_review" | "published" | "rejected" | "archived"): Promise<{ ok: boolean; error?: string }> {
 const user = await guard("news:publish");
 if (!id || !["pending_review", "published", "rejected", "archived"].includes(status)) return { ok: false, error: "Invalid news update." };
@@ -112,11 +124,28 @@ await setBloodRequestStatus(id, status);
 await audit(user, `blood-request:${status}`, "blood_request", id);
 revalidatePath("/admin/blood-requests");
 revalidatePath("/blood-donation"); }
+export async function adminDeleteBloodRequestAction(id: string): Promise<{ ok: boolean; error?: string }> {
+const user = await guard("blood:manage");
+if (!id || typeof id !== "string") return { ok: false, error: "Invalid blood request." };
+const request = await deleteAdminRow("blood_requests", id);
+if (!request) return { ok: false, error: "Blood request not found." };
+await audit(user, "blood-request:delete", "blood_request", id);
+revalidatePath("/admin/blood-requests");
+revalidatePath("/blood-donation");
+return { ok: true }; }
+export async function adminDeleteBloodDonorAction(id: string): Promise<{ ok: boolean; error?: string }> {
+const user = await guard("blood:manage");
+if (!id || typeof id !== "string") return { ok: false, error: "Invalid donor record." };
+const donor = await deleteAdminRow("blood_donors", id);
+if (!donor) return { ok: false, error: "Donor record not found." };
+await audit(user, "blood-donor:delete", "blood_donor", id);
+revalidatePath("/admin/blood-donors");
+revalidatePath("/blood-donation");
+return { ok: true }; }
 export async function adminDeletePlaceAction(id: string) {
 const user = await guard("places:delete");
-await saveDatabase((db) => {
-db.places = db.places.filter((place) => place.id !== id);
-});
+const deleted = await deleteAdminRow("places", id);
+if (!deleted) return { ok: false, error: "Place not found." };
 await audit(user, "place:delete", "place", id);
 revalidatePath("/admin/places");
 revalidatePath("/places"); }
@@ -124,12 +153,9 @@ export async function adminSaveSettingsAction(_prev: { error?: string; success?:
 const user = await guard("settings:manage");
 const siteName = String(formData.get("siteName") ?? "").trim();
 if (!siteName) return { error: "Site name is required." };
-await saveDatabase((db) => {
-db.settings.siteName = siteName;
-db.settings.allowPublicPosts = formData.get("allowPublicPosts") === "on";
-db.settings.requireNewsApproval = formData.get("requireNewsApproval") === "on";
-db.settings.donorDirectoryEnabled = formData.get("donorDirectoryEnabled") === "on";
-});
+const client = createServerClient({ cookies: await cookies() });
+const { error } = await client.database.from("platform_settings").upsert([{ id: "platform", site_name: siteName, allow_public_posts: formData.get("allowPublicPosts") === "on", require_news_approval: formData.get("requireNewsApproval") === "on", donor_directory_enabled: formData.get("donorDirectoryEnabled") === "on", updated_by: user.id, updated_at: new Date().toISOString() }]);
+if (error) return { error: "Settings could not be saved. Please try again." };
 await audit(user, "settings:update", "settings", "platform");
 revalidatePath("/admin/settings");
 return { success: "Settings saved." }; }
@@ -150,9 +176,10 @@ export async function adminDeleteUserAction(userId: string) {
 const user = await requireUser("/admin");
 if (user.role !== "admin") throw new Error("Only an admin can manage user accounts.");
 if (user.id === userId) return;
-await saveDatabase((db) => {
-db.users = db.users.filter((item) => item.id !== userId);
-});
+const client = createServerClient({ cookies: await cookies() });
+const { data: deleted, error } = await client.database.rpc("admin_delete_user", { target_user_id: userId });
+if (error) throw error;
+if (!deleted) return;
 await audit(user, "user:delete", "user", userId);
 revalidatePath("/admin/users"); }
 /** Create a published tourist place. Available to admins and moderators. */ export async function createPlaceAction(_prev: AdminFormState, formData: FormData): Promise<AdminFormState> {
@@ -173,8 +200,7 @@ upazilaId: formData.get("upazilaId") || undefined,
 });
 if (!parsed.success) return { error: formatZodError(parsed.error) };
 const now = new Date().toISOString();
-const place: Place = {
-id: createId("place"),
+const place = {
 slug: slugify(parsed.data.name),
 name: sanitizeText(parsed.data.name, 200),
 category: parsed.data.category,
@@ -198,10 +224,10 @@ divisionId: parsed.data.divisionId ?? null,
 districtId: parsed.data.districtId ?? null,
 upazilaId: parsed.data.upazilaId ?? null,
 };
-await saveDatabase((db) => {
-db.places.push(place);
-});
-await audit(user, "place:create", "place", place.id);
+const client = createServerClient({ cookies: await cookies() });
+const { data: created, error } = await client.database.from("places").insert([{ slug: place.slug, name: place.name, category: place.category, summary: place.summary, description: place.description, address: place.address, latitude: place.latitude, longitude: place.longitude, image: place.image, gallery: place.gallery, rating: place.rating, review_count: place.reviewCount, opening_hours: place.openingHours, entry_fee: place.entryFee, best_time: place.bestTime, status: place.status, verification: place.verification, division_id: place.divisionId, district_id: place.districtId, upazila_id: place.upazilaId }]).select("id").single();
+if (error) return { error: "Place could not be saved. Please try again." };
+await audit(user, "place:create", "place", created.id);
 revalidatePath("/admin/places");
 revalidatePath("/places");
 return { success: "Place created and published." }; }
@@ -257,38 +283,15 @@ notes: formData.get("notes") || undefined,
 });
 if (!parsed.success) return { error: formatZodError(parsed.error) };
 const now = new Date().toISOString();
-const db = await getDatabase();
-const recipientIds = db.users.map((item) => item.id);
-const request = {
-id: createId("req"),
-requesterId: user.id,
-bloodGroup: parsed.data.bloodGroup,
-units: parsed.data.units,
-patient: null,
-hospital: sanitizeText(parsed.data.hospital, 200),
-neededBy: parsed.data.neededBy,
-notes: parsed.data.notes ? sanitizeText(parsed.data.notes, 1000) : null,
-status: "active" as const,
-createdAt: now,
-updatedAt: now,
-divisionId: null,
-districtId: null,
-upazilaId: null,
-};
-await saveDatabase((current) => {
-current.bloodRequests.push(request);
-for (const userId of recipientIds) {
-current.notifications.push({
-id: createId("ntf"),
-userId,
-title: "Emergency blood alert",
-body: `${request.bloodGroup} needed — ${request.hospital}`,
-href: "/blood-donation",
-read: false,
-createdAt: now,
-});
+const client = createServerClient({ cookies: await cookies() });
+const { data: request, error: requestError } = await client.database.from("blood_requests").insert([{ requester_id: user.id, blood_group: parsed.data.bloodGroup, units: parsed.data.units, hospital: sanitizeText(parsed.data.hospital, 200), needed_by: parsed.data.neededBy, notes: parsed.data.notes ? sanitizeText(parsed.data.notes, 1000) : null, status: "active" }]).select("id").single();
+if (requestError) return { error: "Emergency blood request could not be published." };
+const { data: recipients, error: usersError } = await client.database.from("profiles").select("id");
+if (usersError) return { error: "The request was published, but member notifications could not be loaded." };
+if (recipients?.length) {
+const { error: notificationError } = await client.database.from("notifications").insert(recipients.map((recipient: { id: string }) => ({ user_id: recipient.id, title: "Emergency blood alert", body: `${parsed.data.bloodGroup} needed — ${sanitizeText(parsed.data.hospital, 200)}`, href: "/blood-donation" })));
+if (notificationError) return { error: "The request was published, but notifications could not be sent." };
 }
-});
 await audit(user, "blood:emergency_alert", "blood_request", request.id, "success", "Alert sent to all users");
 revalidatePath("/admin/blood-alerts");
 revalidatePath("/blood-donation");
@@ -313,8 +316,7 @@ upazilaId: formData.get("upazilaId") || undefined,
 });
 if (!parsed.success) return { error: formatZodError(parsed.error) };
 const now = new Date().toISOString();
-const service: GovernmentService = {
-id: createId("svc"),
+const service = {
 slug: slugify(parsed.data.name),
 name: sanitizeText(parsed.data.name, 200),
 category: parsed.data.category,
@@ -334,18 +336,17 @@ divisionId: parsed.data.divisionId ?? null,
 districtId: parsed.data.districtId ?? null,
 upazilaId: parsed.data.upazilaId ?? null,
 };
-await saveDatabase((db) => {
-db.governmentServices.push(service);
-});
-await audit(user, "service:create", "government_service", service.id);
+const client = createServerClient({ cookies: await cookies() });
+const { data: created, error } = await client.database.from("government_services").insert([{ slug: service.slug, name: service.name, category: service.category, description: service.description, office_address: service.officeAddress, phone: service.phone, emergency_phone: service.emergencyPhone, website: service.website, hours: service.hours, required_documents: service.requiredDocuments ?? [], status: service.status, division_id: service.divisionId, district_id: service.districtId, upazila_id: service.upazilaId }]).select("id").single();
+if (error) return { error: "Government service could not be saved. Please try again." };
+await audit(user, "service:create", "government_service", created.id);
 revalidatePath("/admin/government-services");
 revalidatePath("/government-services");
 return { success: "Government service created." }; }
 /** Delete a business listing. Available to admins and moderators. */ export async function deleteBusinessAction(id: string) {
 const user = await guard("businesses:edit");
-await saveDatabase((db) => {
-db.businesses = db.businesses.filter((business) => business.id !== id);
-});
+const deleted = await deleteAdminRow("businesses", id);
+if (!deleted) return { ok: false, error: "Business not found." };
 await audit(user, "business:delete", "business", id);
 revalidatePath("/admin/businesses");
 revalidatePath("/businesses"); }
@@ -367,8 +368,7 @@ upazilaId: formData.get("upazilaId") || undefined,
 });
 if (!parsed.success) return { error: formatZodError(parsed.error) };
 const now = new Date().toISOString();
-const business: Business = {
-id: createId("biz"),
+const business = {
 slug: slugify(parsed.data.name),
 name: sanitizeText(parsed.data.name, 200),
 category: parsed.data.category,
@@ -385,10 +385,10 @@ divisionId: parsed.data.divisionId ?? null,
 districtId: parsed.data.districtId ?? null,
 upazilaId: parsed.data.upazilaId ?? null,
 };
-await saveDatabase((db) => {
-db.businesses.push(business);
-});
-await audit(user, "business:create", "business", business.id);
+const client = createServerClient({ cookies: await cookies() });
+const { data: created, error } = await client.database.from("businesses").insert([{ slug: business.slug, name: business.name, category: business.category, description: business.description, address: business.address, phone: business.phone, website: business.website, image: business.image, status: business.status, verification: business.verification, division_id: business.divisionId, district_id: business.districtId, upazila_id: business.upazilaId }]).select("id").single();
+if (error) return { error: "Business could not be saved. Please try again." };
+await audit(user, "business:create", "business", created.id);
 revalidatePath("/admin/businesses");
 revalidatePath("/businesses");
 return { success: "Business created." }; }
@@ -409,84 +409,46 @@ const parentId = parsed.data.parentId ?? "";
 if (parsed.data.category !== "division" && !parentId) {
 return { error: "Select a parent division/district for this location." };
 }
-await saveDatabase((db) => {
+const client = createServerClient({ cookies: await cookies() });
+let table: string; let row: Record<string, unknown>;
 if (parsed.data.category === "division") {
-db.divisions.push({
-id: createId("div"),
-slug: slugify(name),
-name,
-bnName: title,
-capital: name,
-districtsCount: 0,
-summary: title,
-image,
-});
+table = "divisions"; row = { id: createId("div"), slug: slugify(name), name, capital: name, districts_count: 0, summary: title, image };
 } else if (parsed.data.category === "district") {
-db.districts.push({
-id: createId("dis"),
-slug: slugify(name),
-name,
-divisionId: parentId,
-summary: title,
-image,
-});
-const division = db.divisions.find((item) => item.id === parentId);
-if (division) {
-division.districtsCount = db.districts.filter((item) => item.divisionId === parentId).length;
-}
+table = "districts"; row = { id: createId("dis"), slug: slugify(name), name, division_id: parentId, summary: title, image };
 } else {
-db.upazilas.push({
-id: createId("upa"),
-slug: slugify(name),
-name,
-districtId: parentId,
-image,
-summary: title,
-});
+table = "upazilas"; row = { id: createId("upa"), slug: slugify(name), name, district_id: parentId, summary: title, image };
 }
-});
+const { error } = await client.database.from(table).insert([row]);
+if (error) return { error: `${parsed.data.category} could not be saved. Please try again.` };
 await audit(user, `location:${parsed.data.category}:create`, "location", name);
 revalidatePath("/admin/locations");
 return { success: `${parsed.data.category[0]!.toUpperCase()}${parsed.data.category.slice(1)} added.` }; }
 /** Hide (archive) or restore a tourist place. Admin and moderators. */ export async function adminSetPlaceStatusAction(id: string, status: "published" | "archived") {
 const user = await guard("places:edit");
-await saveDatabase((db) => {
-const place = db.places.find((item) => item.id === id);
-if (!place) return;
-place.status = status;
-place.updatedAt = new Date().toISOString();
-});
+const updated = await updateAdminRow("places", id, { status });
+if (!updated) return { ok: false, error: "Place not found." };
 await audit(user, `place:${status}`, "place", id);
 revalidatePath("/admin/places");
 revalidatePath("/admin/tourism");
 revalidatePath("/places"); }
 /** Hide (archive) or restore a business. Admin and moderators. */ export async function adminSetBusinessStatusAction(id: string, status: "published" | "archived") {
 const user = await guard("businesses:edit");
-await saveDatabase((db) => {
-const business = db.businesses.find((item) => item.id === id);
-if (!business) return;
-business.status = status;
-business.updatedAt = new Date().toISOString();
-});
+const updated = await updateAdminRow("businesses", id, { status });
+if (!updated) return { ok: false, error: "Business not found." };
 await audit(user, `business:${status}`, "business", id);
 revalidatePath("/admin/businesses");
 revalidatePath("/businesses"); }
 /** Hide (archive) or restore a government service. Admin and moderators. */ export async function adminSetServiceStatusAction(id: string, status: "published" | "archived") {
 const user = await guard("services:edit");
-await saveDatabase((db) => {
-const service = db.governmentServices.find((item) => item.id === id);
-if (!service) return;
-service.status = status;
-service.updatedAt = new Date().toISOString();
-});
+const updated = await updateAdminRow("government_services", id, { status });
+if (!updated) return { ok: false, error: "Service not found." };
 await audit(user, `service:${status}`, "government_service", id);
 revalidatePath("/admin/government-services");
 revalidatePath("/government-services"); }
 /** Delete a government service. Admin and moderators. */ export async function adminDeleteServiceAction(id: string) {
 const user = await guard("services:edit");
-await saveDatabase((db) => {
-db.governmentServices = db.governmentServices.filter((service) => service.id !== id);
-});
+const deleted = await deleteAdminRow("government_services", id);
+if (!deleted) return { ok: false, error: "Service not found." };
 await audit(user, "service:delete", "government_service", id);
 revalidatePath("/admin/government-services");
 revalidatePath("/government-services"); }
@@ -508,25 +470,7 @@ districtId: formData.get("districtId") || undefined,
 upazilaId: formData.get("upazilaId") || undefined,
 });
 if (!parsed.success) return { error: formatZodError(parsed.error) };
-let updated = false;
-await saveDatabase((db) => {
-const place = db.places.find((item) => item.id === id);
-if (!place) return;
-place.name = sanitizeText(parsed.data.name, 200);
-place.category = parsed.data.category;
-place.summary = sanitizeText(parsed.data.summary, 300);
-place.description = sanitizeMultiline(parsed.data.description);
-place.address = sanitizeText(parsed.data.address, 300);
-place.openingHours = parsed.data.openingHours;
-place.entryFee = parsed.data.entryFee;
-place.bestTime = parsed.data.bestTime;
-if (parsed.data.image) place.image = parsed.data.image;
-place.divisionId = parsed.data.divisionId ?? null;
-place.districtId = parsed.data.districtId ?? null;
-place.upazilaId = parsed.data.upazilaId ?? null;
-place.updatedAt = new Date().toISOString();
-updated = true;
-});
+const updated = await updateAdminRow("places", id, { name: sanitizeText(parsed.data.name, 200), slug: slugify(parsed.data.name), category: parsed.data.category, summary: sanitizeText(parsed.data.summary, 300), description: sanitizeMultiline(parsed.data.description), address: sanitizeText(parsed.data.address, 300), opening_hours: parsed.data.openingHours ?? null, entry_fee: parsed.data.entryFee ?? null, best_time: parsed.data.bestTime ?? null, ...(parsed.data.image ? { image: parsed.data.image } : {}), division_id: parsed.data.divisionId ?? null, district_id: parsed.data.districtId ?? null, upazila_id: parsed.data.upazilaId ?? null });
 if (!updated) return { error: "Place not found." };
 await audit(user, "place:update", "place", id);
 revalidatePath("/admin/places");
@@ -549,23 +493,7 @@ districtId: formData.get("districtId") || undefined,
 upazilaId: formData.get("upazilaId") || undefined,
 });
 if (!parsed.success) return { error: formatZodError(parsed.error) };
-let updated = false;
-await saveDatabase((db) => {
-const business = db.businesses.find((item) => item.id === id);
-if (!business) return;
-business.name = sanitizeText(parsed.data.name, 200);
-business.category = parsed.data.category;
-business.description = sanitizeMultiline(parsed.data.description);
-business.address = sanitizeText(parsed.data.address, 300);
-business.phone = parsed.data.phone ? sanitizeText(parsed.data.phone, 50) : null;
-business.website = parsed.data.website ? sanitizeText(parsed.data.website, 200) : null;
-if (parsed.data.image) business.image = parsed.data.image;
-business.divisionId = parsed.data.divisionId ?? null;
-business.districtId = parsed.data.districtId ?? null;
-business.upazilaId = parsed.data.upazilaId ?? null;
-business.updatedAt = new Date().toISOString();
-updated = true;
-});
+const updated = await updateAdminRow("businesses", id, { name: sanitizeText(parsed.data.name, 200), slug: slugify(parsed.data.name), category: parsed.data.category, description: sanitizeMultiline(parsed.data.description), address: sanitizeText(parsed.data.address, 300), phone: parsed.data.phone ? sanitizeText(parsed.data.phone, 50) : null, website: parsed.data.website ? sanitizeText(parsed.data.website, 200) : null, ...(parsed.data.image ? { image: parsed.data.image } : {}), division_id: parsed.data.divisionId ?? null, district_id: parsed.data.districtId ?? null, upazila_id: parsed.data.upazilaId ?? null });
 if (!updated) return { error: "Business not found." };
 await audit(user, "business:update", "business", id);
 revalidatePath("/admin/businesses");
@@ -589,27 +517,7 @@ districtId: formData.get("districtId") || undefined,
 upazilaId: formData.get("upazilaId") || undefined,
 });
 if (!parsed.success) return { error: formatZodError(parsed.error) };
-let updated = false;
-await saveDatabase((db) => {
-const service = db.governmentServices.find((item) => item.id === id);
-if (!service) return;
-service.name = sanitizeText(parsed.data.name, 200);
-service.category = parsed.data.category;
-service.description = sanitizeMultiline(parsed.data.description);
-service.officeAddress = sanitizeText(parsed.data.officeAddress, 300);
-service.phone = parsed.data.phone ? sanitizeText(parsed.data.phone, 50) : null;
-service.emergencyPhone = parsed.data.emergencyPhone ? sanitizeText(parsed.data.emergencyPhone, 50) : null;
-service.website = parsed.data.website ? sanitizeText(parsed.data.website, 200) : null;
-service.hours = parsed.data.hours;
-service.requiredDocuments = parsed.data.requiredDocuments
-? parsed.data.requiredDocuments.split(",").map((item) => item.trim()).filter(Boolean)
-: undefined;
-service.divisionId = parsed.data.divisionId ?? null;
-service.districtId = parsed.data.districtId ?? null;
-service.upazilaId = parsed.data.upazilaId ?? null;
-service.updatedAt = new Date().toISOString();
-updated = true;
-});
+const updated = await updateAdminRow("government_services", id, { name: sanitizeText(parsed.data.name, 200), slug: slugify(parsed.data.name), category: parsed.data.category, description: sanitizeMultiline(parsed.data.description), office_address: sanitizeText(parsed.data.officeAddress, 300), phone: parsed.data.phone ? sanitizeText(parsed.data.phone, 50) : null, emergency_phone: parsed.data.emergencyPhone ? sanitizeText(parsed.data.emergencyPhone, 50) : null, website: parsed.data.website ? sanitizeText(parsed.data.website, 200) : null, hours: parsed.data.hours ?? null, required_documents: parsed.data.requiredDocuments ? parsed.data.requiredDocuments.split(",").map((item) => item.trim()).filter(Boolean) : [], division_id: parsed.data.divisionId ?? null, district_id: parsed.data.districtId ?? null, upazila_id: parsed.data.upazilaId ?? null });
 if (!updated) return { error: "Service not found." };
 await audit(user, "service:update", "government_service", id);
 revalidatePath("/admin/government-services");

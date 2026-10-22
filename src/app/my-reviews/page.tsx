@@ -1,14 +1,12 @@
 // @ts-nocheck
 import Link from "next/link";
-import { requireUser } from "@/lib/auth/current-user"; import { getDatabase } from "@/lib/db/store"; import { relativeTime } from "@/lib/utils"; import { AccountShell } from "@/components/layout/account-shell"; import { Badge, Card } from "@/components/ui/badge"; import { EmptyState } from "@/components/ui/empty-state"; import { Icon } from "@/components/ui/icons";
+import { requireUser } from "@/lib/auth/current-user"; import { insforgeSelectMany } from "@/lib/insforge"; import { mapDbRow } from "@/lib/db/insforge"; import { listPlaces } from "@/services/places"; import { relativeTime } from "@/lib/utils"; import { AccountShell } from "@/components/layout/account-shell"; import { Badge, Card } from "@/components/ui/badge"; import { EmptyState } from "@/components/ui/empty-state"; import { Icon } from "@/components/ui/icons";
 export const metadata = { title: "My reviews", robots: { index: false, follow: false } };
 export default async function MyReviewsPage() {
 const user = await requireUser("/my-reviews");
-const db = await getDatabase();
-const reviews = db.reviews
-.filter((review) => review.authorId === user.id && review.status === "visible")
-.sort((a, b) => b.createdAt.localeCompare(a.createdAt));
-const placeById = new Map(db.places.map((place) => [place.id, place]));
+const [{ data }, placesResult] = await Promise.all([insforgeSelectMany("reviews", { author_id: `eq.${user.id}`, status: "eq.visible", order: "created_at.desc" }), listPlaces({ page: 1, pageSize: 500 })]);
+const reviews = mapDbRow(data || []);
+const placeById = new Map(placesResult.items.map((place) => [place.id, place]));
 return (
 <AccountShell user={user} title="My reviews" description="Your reviews of places.">
 {reviews.length === 0 ? (

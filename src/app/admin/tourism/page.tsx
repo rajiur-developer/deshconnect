@@ -1,10 +1,10 @@
 // @ts-nocheck
 import Link from "next/link";
-import { getDatabase } from "@/lib/db/store"; import { getDirectoryLocationOptions } from "@/services/locations"; import { Badge, Card } from "@/components/ui/badge"; import { PageHeader } from "@/components/layout/page-header"; import { PlaceForm } from "@/components/admin/place-form"; import { RecordActions } from "@/components/admin/record-actions"; import { placeCategoryLabel } from "@/components/cards/place-card";
+import { insforgeSelectMany } from "@/lib/insforge"; import { mapDbRow } from "@/lib/db/insforge"; import { getDirectoryLocationOptions } from "@/services/locations"; import { Badge, Card } from "@/components/ui/badge"; import { PageHeader } from "@/components/layout/page-header"; import { PlaceForm } from "@/components/admin/place-form"; import { RecordActions } from "@/components/admin/record-actions"; import { placeCategoryLabel } from "@/components/cards/place-card";
 export const metadata = { title: "Tourism" };
 export default async function AdminTourismPage() {
-const [db, options] = await Promise.all([getDatabase(), getDirectoryLocationOptions()]);
-const places = [...db.places].sort((a, b) => b.rating - a.rating);
+const [{ data }, options] = await Promise.all([insforgeSelectMany("places", { order: "rating.desc", limit: "500" }), getDirectoryLocationOptions()]);
+const places = mapDbRow(data || []);
 return (
 <>
 <PageHeader title="Tourism" description="Manage the tourism directory and destination content." />

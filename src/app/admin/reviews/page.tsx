@@ -1,11 +1,10 @@
 // @ts-nocheck
 import Link from "next/link";
-import { getDatabase } from "@/lib/db/store"; import { Badge, Card } from "@/components/ui/badge"; import { PageHeader } from "@/components/layout/page-header"; import { ReviewStatusButton } from "@/components/admin/admin-client"; import { relativeTime } from "@/lib/utils";
+import { listAdminReviews } from "@/services/community"; import { listPlaces } from "@/services/places"; import { Badge, Card } from "@/components/ui/badge"; import { PageHeader } from "@/components/layout/page-header"; import { ReviewStatusButton } from "@/components/admin/admin-client"; import { relativeTime } from "@/lib/utils";
 export const metadata = { title: "Reviews" };
 export default async function AdminReviewsPage() {
-const db = await getDatabase();
-const reviews = [...db.reviews].sort((a, b) => b.createdAt.localeCompare(a.createdAt));
-const placeById = new Map(db.places.map((place) => [place.id, place]));
+const [reviews, placeResult] = await Promise.all([listAdminReviews(), listPlaces({ page: 1, pageSize: 500 })]);
+const placeById = new Map(placeResult.items.map((place) => [place.id, place]));
 return (
 <>
 <PageHeader title="Reviews" description="Moderate reviews submitted by the community." />

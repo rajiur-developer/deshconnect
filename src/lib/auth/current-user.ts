@@ -1,4 +1,5 @@
 import "server-only";
+import { cache } from "react";
 import { redirect } from "next/navigation";
 import { createServerClient } from "@insforge/sdk/ssr";
 import { cookies } from "next/headers";
@@ -49,12 +50,12 @@ async function resolveProfile(user: any): Promise<PublicUser | null> {
   };
 }
 
-export async function getCurrentUser(): Promise<PublicUser | null> {
+export const getCurrentUser = cache(async (): Promise<PublicUser | null> => {
   const client = createServerClient({ cookies: await cookies() });
   const { data, error } = await client.auth.getCurrentUser();
   if (error || !data?.user) return null;
   return resolveProfile(data.user);
-}
+});
 
 /** Require an InsForge Auth session, otherwise redirect to /login. */
 export async function requireUser(redirectTo?: string): Promise<PublicUser> {

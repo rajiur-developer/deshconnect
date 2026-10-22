@@ -2,7 +2,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { createBrowserClient } from "@insforge/sdk/ssr";
+import { getInsForgeBrowserClient } from "@/lib/insforge-browser";
 import { initials } from "@/lib/utils";
 import { PROFILE_IMAGE_BUCKET } from "@/features/account/constants";
 
@@ -22,7 +22,7 @@ export function ProfileAvatar({ name, src, storageKey, className = "", textClass
     setImageSrc(src ?? "");
     setImageFailed(false);
     if (!src && storageKey) {
-      void createBrowserClient().storage.from(PROFILE_IMAGE_BUCKET).createSignedUrl(storageKey, 3600)
+      void getInsForgeBrowserClient().storage.from(PROFILE_IMAGE_BUCKET).createSignedUrl(storageKey, 3600)
         .then(({ data }) => {
           if (active && data?.signedUrl) setImageSrc(data.signedUrl);
           else if (active) setImageFailed(true);
@@ -34,7 +34,7 @@ export function ProfileAvatar({ name, src, storageKey, className = "", textClass
   async function recoverImage() {
     if (storageKey) {
       try {
-        const { data } = await createBrowserClient().storage.from(PROFILE_IMAGE_BUCKET).createSignedUrl(storageKey, 3600);
+        const { data } = await getInsForgeBrowserClient().storage.from(PROFILE_IMAGE_BUCKET).createSignedUrl(storageKey, 3600);
         if (data?.signedUrl) { setImageSrc(data.signedUrl); setImageFailed(false); return; }
       } catch { /* Use initials when the profile image cannot be reached. */ }
     }

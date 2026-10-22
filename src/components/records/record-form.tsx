@@ -1,7 +1,7 @@
 "use client";
 
 import { useActionState, useEffect, useRef, useState, type FormEvent } from "react";
-import { createBrowserClient } from "@insforge/sdk/ssr";
+import { getInsForgeBrowserClient } from "@/lib/insforge-browser";
 import { createRecordAction, type RecordFormState } from "@/features/records/actions";
 import { RECORD_ATTACHMENT_BUCKET, RECORD_ATTACHMENT_MAX_BYTES, RECORD_ATTACHMENT_TYPES } from "@/features/records/constants";
 import { Button } from "@/components/ui/button";
@@ -60,7 +60,7 @@ export function RecordForm({ userId }: { userId: string }) {
     uploadInProgress.current = true;
     setUploading(true);
     try {
-      const client = createBrowserClient();
+      const client = getInsForgeBrowserClient();
       const key = `${userId}/${crypto.randomUUID()}-${safeFilename(file.name)}`;
       const { data, error } = await client.storage.from(RECORD_ATTACHMENT_BUCKET).upload(key, file);
       if (error || !data?.url || !data?.key) {

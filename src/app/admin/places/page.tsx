@@ -1,10 +1,10 @@
 // @ts-nocheck
 import Link from "next/link";
-import { getDatabase } from "@/lib/db/store"; import { getDirectoryLocationOptions } from "@/services/locations"; import { Badge, Card } from "@/components/ui/badge"; import { PageHeader } from "@/components/layout/page-header"; import { PlaceForm } from "@/components/admin/place-form"; import { RecordActions } from "@/components/admin/record-actions"; import { formatDate } from "@/lib/utils";
+import { insforgeSelectMany } from "@/lib/insforge"; import { mapDbRow } from "@/lib/db/insforge"; import { getDirectoryLocationOptions } from "@/services/locations"; import { Badge, Card } from "@/components/ui/badge"; import { PageHeader } from "@/components/layout/page-header"; import { PlaceForm } from "@/components/admin/place-form"; import { RecordActions } from "@/components/admin/record-actions"; import { formatDate } from "@/lib/utils";
 export const metadata = { title: "Places" };
 export default async function AdminPlacesPage() {
-const [db, options] = await Promise.all([getDatabase(), getDirectoryLocationOptions()]);
-const places = [...db.places].sort((a, b) => b.updatedAt.localeCompare(a.updatedAt));
+const [{ data }, options] = await Promise.all([insforgeSelectMany("places", { order: "updated_at.desc", limit: "500" }), getDirectoryLocationOptions()]);
+const places = mapDbRow(data || []);
 return (
 <>
 <PageHeader title="Places" description="Create, edit and delete tourist-place records." />

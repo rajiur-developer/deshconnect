@@ -1,7 +1,7 @@
 // @ts-nocheck
 "use client";
 import { useActionState, useRef, useState, type FormEvent } from "react";
-import { createBrowserClient } from "@insforge/sdk/ssr";
+import { getInsForgeBrowserClient } from "@/lib/insforge-browser";
 import { COMMUNITY_POST_IMAGE_BUCKET } from "@/features/account/constants";
 import { submitNewsAction, type NewsFormState } from "@/features/news/actions"; import { Button } from "@/components/ui/button"; import { Field, Input, Textarea } from "@/components/ui/input"; import { useFormStateToast } from "@/components/ui/toast";
 const CATEGORIES = [
@@ -35,7 +35,7 @@ if (file.size < 1 || file.size > 5 * 1024 * 1024) { setUploadError("Image must b
 uploadBusy.current = true;
 setUploading(true);
 try {
-const client = createBrowserClient();
+const client = getInsForgeBrowserClient();
 const filename = file.name.normalize("NFKD").replace(/[^a-zA-Z0-9._-]+/g, "-").slice(-80) || "news-image";
 const key = `${userId}/news/${crypto.randomUUID()}-${filename}`;
 const { data, error } = await client.storage.from(COMMUNITY_POST_IMAGE_BUCKET).upload(key, file);
@@ -90,4 +90,3 @@ return (
 <Button type="submit" disabled={pending || uploading}>{uploading ? "Uploading image…" : pending ? "Submitting…" : "Submit for review"}</Button>
 </form>
 ); }
-

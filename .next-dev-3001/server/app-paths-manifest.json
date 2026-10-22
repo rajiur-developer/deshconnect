@@ -1,0 +1,8 @@
+{
+  "/government-services/page": "app/government-services/page.js",
+  "/news/page": "app/news/page.js",
+  "/government-services/[slug]/page": "app/government-services/[slug]/page.js",
+  "/admin/page": "app/admin/page.js",
+  "/admin/government-services/page": "app/admin/government-services/page.js",
+  "/admin/news/page": "app/admin/news/page.js"
+}

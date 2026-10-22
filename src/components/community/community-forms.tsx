@@ -1,7 +1,7 @@
 // @ts-nocheck
 "use client";
 import { useActionState, useRef, useState, type FormEvent } from "react";
-import { createBrowserClient } from "@insforge/sdk/ssr";
+import { getInsForgeBrowserClient } from "@/lib/insforge-browser";
 import { COMMUNITY_POST_IMAGE_BUCKET } from "@/features/account/constants";
 import {
 createCommentAction,
@@ -38,7 +38,7 @@ if (file.size < 1 || file.size > 3 * 1024 * 1024) { setUploadError("Image must b
 uploadBusy.current = true;
 setUploading(true);
 try {
-const client = createBrowserClient();
+const client = getInsForgeBrowserClient();
 const filename = file.name.normalize("NFKD").replace(/[^a-zA-Z0-9._-]+/g, "-").slice(-80) || "post-image";
 const key = `${userId}/${crypto.randomUUID()}-${filename}`;
 const { data, error } = await client.storage.from(COMMUNITY_POST_IMAGE_BUCKET).upload(key, file);

@@ -93,6 +93,36 @@ html[lang="bn"] body {
   }
 }
 
+@media (max-width: 767px) {
+  html.mobile-chat-open,
+  html.mobile-chat-open body {
+    overflow: hidden;
+    overscroll-behavior: none;
+  }
+
+  .mobile-conversation {
+    height: auto;
+    min-height: 0;
+  }
+
+  @supports (height: 100dvh) {
+    .mobile-conversation {
+      height: calc(100dvh - 4rem);
+      bottom: auto;
+    }
+  }
+
+  .chat-message-scroll {
+    overscroll-behavior: contain;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .chat-composer {
+    position: relative;
+    padding-bottom: calc(1rem + env(safe-area-inset-bottom, 0px));
+  }
+}
+
 @layer components {
   .container-x {
     @apply mx-auto w-full max-w-7xl px-4 sm:px-6 lg:px-8;
@@ -374,6 +404,150 @@ html[lang="bn"] body {
   to {
     transform: translateX(100%);
   }
+}
+
+@keyframes page-enter {
+  from { opacity: 0; transform: translate3d(0, 12px, 0) scale(0.99); }
+  to { opacity: 1; transform: translate3d(0, 0, 0) scale(1); }
+}
+
+@keyframes tab-panel-enter {
+  from { opacity: 0; transform: translate3d(14px, 0, 0); }
+  to { opacity: 1; transform: translate3d(0, 0, 0); }
+}
+
+@keyframes tab-panel-exit {
+  from { opacity: 1; transform: translate3d(0, 0, 0); }
+  to { opacity: 0; transform: translate3d(-8px, 0, 0); }
+}
+
+@keyframes message-enter {
+  from { opacity: 0; transform: translate3d(12px, 6px, 0) scale(0.98); }
+  to { opacity: 1; transform: translate3d(0, 0, 0) scale(1); }
+}
+
+@keyframes modal-backdrop-enter {
+  from { opacity: 0; backdrop-filter: blur(0); }
+  to { opacity: 1; backdrop-filter: blur(6px); }
+}
+
+@keyframes modal-panel-enter {
+  from { opacity: 0; transform: translate3d(0, 10px, 0) scale(0.96); }
+  to { opacity: 1; transform: translate3d(0, 0, 0) scale(1); }
+}
+
+@keyframes modal-backdrop-exit {
+  from { opacity: 1; backdrop-filter: blur(6px); }
+  to { opacity: 0; backdrop-filter: blur(0); }
+}
+
+@keyframes modal-panel-exit {
+  from { opacity: 1; transform: translate3d(0, 0, 0) scale(1); }
+  to { opacity: 0; transform: translate3d(0, 8px, 0) scale(0.97); }
+}
+
+@keyframes success-pulse {
+  0%, 100% { transform: scale(1); }
+  45% { transform: scale(1.16); }
+}
+
+@keyframes error-shake {
+  0%, 100% { transform: translateX(0); }
+  20%, 60% { transform: translateX(-4px); }
+  40%, 80% { transform: translateX(4px); }
+}
+
+@keyframes border-flash {
+  0%, 100% { border-color: rgb(239 68 68 / 0.35); }
+  50% { border-color: rgb(239 68 68 / 0.9); }
+}
+
+@keyframes spinner-rotate {
+  to { transform: rotate(360deg); }
+}
+
+@keyframes confetti-burst {
+  0% { opacity: 0; transform: translateY(4px) scale(0.4); }
+  20% { opacity: 1; }
+  100% { opacity: 0; transform: translateY(-28px) scale(1); }
+}
+
+.page-transition-enter {
+  animation: page-enter 320ms cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+.tab-panel-enter {
+  animation: tab-panel-enter 240ms cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+.tab-panel-exit {
+  animation: tab-panel-exit 140ms ease-in both;
+}
+
+.tab-trigger {
+  transition: color 160ms ease, background-color 160ms ease, box-shadow 160ms ease;
+}
+
+.tab-trigger[aria-selected="true"] {
+  background-color: var(--color-brand-50);
+  color: var(--color-brand-800);
+  box-shadow: inset 0 -2px 0 var(--color-brand-600);
+}
+
+.message-enter {
+  animation: message-enter 220ms cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+.modal-backdrop-enter {
+  animation: modal-backdrop-enter 180ms ease-out both;
+}
+
+.modal-panel-enter {
+  animation: modal-panel-enter 220ms cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+.modal-backdrop-exit {
+  animation: modal-backdrop-exit 160ms ease-in both;
+}
+
+.modal-panel-exit {
+  animation: modal-panel-exit 160ms ease-in both;
+}
+
+.motion-toast-exit {
+  animation: modal-panel-exit 160ms ease-in both;
+}
+
+.success-toast {
+  position: relative;
+  overflow: visible;
+}
+
+.success-toast::after {
+  position: absolute;
+  top: 0.8rem;
+  left: 1.4rem;
+  width: 4px;
+  height: 4px;
+  border-radius: 1px;
+  background: #22c55e;
+  box-shadow: 10px 3px #38bdf8, 22px 0 #f59e0b, 29px 6px #a78bfa, 4px 10px #f472b6;
+  content: "";
+  pointer-events: none;
+  animation: confetti-burst 700ms ease-out both;
+}
+
+.motion-success {
+  animation: success-pulse 420ms ease-out;
+}
+
+.motion-error {
+  animation: error-shake 320ms ease-in-out, border-flash 800ms ease-in-out;
+  border: 1px solid rgb(239 68 68 / 0.45);
+}
+
+.motion-spinner {
+  animation: spinner-rotate 700ms linear infinite;
 }
 
 /* Initial paint: hero and top-of-page content settle in. */

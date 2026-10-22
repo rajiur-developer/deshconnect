@@ -66,11 +66,23 @@ export async function insforgeCreatePost(input: {
 }
 
 export async function insforgeListUserComments(userId: string) {
-  const { data } = await insforgeSelectMany("comments", {
+  const { data: comments } = await insforgeSelectMany("comments", {
     author_id: `eq.${userId}`,
-    posts: "status.eq.visible",
   });
-  return (data || []).map((r: any) => ({
+  if (!comments?.length) return [];
+
+  // Filter comments by visible parent posts in a second query. Passing a
+  // relationship filter as a value ("posts: status.eq.visible") produces an
+  // invalid PostgREST expression and breaks dashboard/comment pages.
+  const postIds = [...new Set(comments.map((row: any) => row.post_id).filter(Boolean))];
+  if (!postIds.length) return [];
+  const { data: posts } = await insforgeSelectMany("posts", {
+    id: `in.(${postIds.join(",")})`,
+    status: "eq.visible",
+  });
+  const visiblePostIds = new Set((posts || []).map((row: any) => row.id));
+
+  return comments.filter((row: any) => visiblePostIds.has(row.post_id)).map((r: any) => ({
     id: r.id,
     postId: r.post_id,
     authorId: r.author_id,
@@ -118,6 +130,25 @@ export const listUserComments = insforgeListUserComments;
 export async function listUserReports(userId: string) {
   const { data } = await insforgeSelectMany("reports", { reporter_id: `eq.${userId}`, order: "created_at.desc" });
   return data;
+}
+export async function listAdminReports() {
+  const { data, error } = await insforgeSelectMany("reports", { order: "created_at.desc" });
+  if (error) throw error;
+  return (data || []).map((row: any) => ({
+    id: row.id, targetType: row.target_type, targetId: row.target_id,
+    reporterId: row.reporter_id, reason: row.reason, details: row.details,
+    status: row.status, resolution: row.resolution, createdAt: row.created_at,
+    updatedAt: row.updated_at,
+  }));
+}
+export async function listAdminReviews() {
+  const { data, error } = await insforgeSelectMany("reviews", { order: "created_at.desc" });
+  if (error) throw error;
+  return (data || []).map((row: any) => ({
+    id: row.id, placeId: row.place_id, authorId: row.author_id,
+    rating: row.rating, title: row.title, body: row.body, status: row.status,
+    createdAt: row.created_at, updatedAt: row.updated_at,
+  }));
 }
 export async function setReviewStatus(id: string, status: string) {
   const { error } = await insforgeUpdate("reviews", id, { status, updated_at: new Date().toISOString() });

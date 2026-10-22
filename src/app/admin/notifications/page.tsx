@@ -1,10 +1,10 @@
 // @ts-nocheck
-import { getDatabase } from "@/lib/db/store"; import { Card } from "@/components/ui/badge"; import { PageHeader } from "@/components/layout/page-header"; import { relativeTime } from "@/lib/utils";
+import { insforgeSelectMany } from "@/lib/insforge"; import { mapDbRow } from "@/lib/db/insforge"; import { listAdminUsers } from "@/services/users"; import { Card } from "@/components/ui/badge"; import { PageHeader } from "@/components/layout/page-header"; import { relativeTime } from "@/lib/utils";
 export const metadata = { title: "Notifications" };
 export default async function AdminNotificationsPage() {
-const db = await getDatabase();
-const userById = new Map(db.users.map((user) => [user.id, user]));
-const notifications = [...db.notifications].sort((a, b) => b.createdAt.localeCompare(a.createdAt));
+const [{ data }, users] = await Promise.all([insforgeSelectMany("notifications", { order: "created_at.desc", limit: "500" }), listAdminUsers()]);
+const notifications = mapDbRow(data || []);
+const userById = new Map(users.map((user) => [user.id, user]));
 return (
 <>
 <PageHeader title="Notifications" description="Platform notifications sent to members." />

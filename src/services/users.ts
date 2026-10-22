@@ -37,8 +37,6 @@ async function findDevelopmentUser(match: (user: any) => boolean) {
 }
 
 export async function insforgeListUsers(query?: {
-  role?: string;
-  status?: string;
   page?: number;
   pageSize?: number;
   ids?: string[];
@@ -46,34 +44,34 @@ export async function insforgeListUsers(query?: {
   const params: Record<string, string> = {};
   const ids = [...new Set(query?.ids ?? [])].filter(Boolean);
   if (ids.length) params.id = `in.(${ids.join(",")})`;
-  if (query?.role) params.role = `eq.${query.role}`;
-  if (query?.status) params.status = `eq.${query.status}`;
   const page = query?.page ?? 1;
   const pageSize = query?.pageSize ?? (ids.length || 200);
   params.offset = ((page - 1) * pageSize).toString();
   params.limit = pageSize.toString();
   params.order = "created_at.desc";
-  const { data, error } = await insforgeSelectMany("profiles", params);
+  // Public directories and author lists must use the public view. The profiles
+  // table intentionally denies anonymous reads and includes private fields.
+  const { data, error } = await insforgeSelectMany("public_profiles", params);
   if (error) throw error;
   return (data || []).map((r: any) => ({
       id: r.id,
       username: r.username,
       fullName: r.full_name,
-      email: r.email,
-      phone: r.phone,
+      email: null,
+      phone: null,
       avatar: r.avatar,
       avatarKey: r.avatar_key,
       bio: r.bio,
       divisionId: r.division_id,
       districtId: r.district_id,
       upazilaId: r.upazila_id,
-      role: r.role,
-      status: r.status,
-      emailVerified: r.email_verified,
-      termsAcceptedAt: r.terms_accepted_at,
-      bloodGroup: r.blood_group,
-      gender: r.gender,
-      dateOfBirth: r.date_of_birth,
+      role: undefined,
+      status: undefined,
+      emailVerified: undefined,
+      termsAcceptedAt: undefined,
+      bloodGroup: undefined,
+      gender: undefined,
+      dateOfBirth: undefined,
       createdAt: r.created_at,
       updatedAt: r.updated_at,
   }));

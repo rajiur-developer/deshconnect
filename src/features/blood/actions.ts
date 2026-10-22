@@ -1,6 +1,7 @@
 // @ts-nocheck
 "use server";
 import { revalidatePath } from "next/cache";
+import { getDonationEligibility } from "@/lib/blood-donation";
 import { requireUser } from "@/lib/auth/current-user"; import { insforge } from "@/lib/insforge"; import { mapDbRow } from "@/lib/db/insforge"; import { formatZodError, bloodRequestSchema, donorSchema, messageSchema } from "@/lib/validation/schemas"; import { sanitizeMultiline, sanitizeText } from "@/lib/security/sanitize"; import { rateLimit } from "@/lib/security/rate-limit"; import { RATES } from "@/lib/constants"; import { notify } from "@/services/notifications"; import { createBloodRequest, upsertDonor } from "@/services/blood";
 export type BloodFormState = { error?: string; success?: string };
 const ONE_YEAR_MS = 365 * 24 * 60 * 60 * 1000;
@@ -28,15 +29,17 @@ if (!parsed.data.consentListed) {
 return { error: "You must consent to being listed as a donor." };
 }
 if (!parsed.data.consentContact) return { error: "Consent to showing your phone and WhatsApp publicly is required to list your contact details." };
-if (!parsed.data.phone || !parsed.data.whatsapp) return { error: "Enter both a phone number and WhatsApp number so donors can reach you." };
+if (parsed.data.availability === "available" && !getDonationEligibility(parsed.data.lastDonationAt)?.eligible) {
+return { error: "You can mark yourself Ready only 75 days after your last donation." };
+}
 await upsertDonor({
 userId: user.id,
 bloodGroup: parsed.data.bloodGroup,
 availability: parsed.data.availability,
 preferredContact: parsed.data.preferredContact,
-contactValue: sanitizeText(parsed.data.contactValue || parsed.data.phone || parsed.data.whatsapp || "", 200),
-phone: parsed.data.phone ? sanitizeText(parsed.data.phone, 30) : undefined,
-whatsapp: parsed.data.whatsapp ? sanitizeText(parsed.data.whatsapp, 30) : undefined,
+contactValue: sanitizeText(parsed.data.contactValue, 200),
+phone: sanitizeText(parsed.data.phone, 30),
+whatsapp: sanitizeText(parsed.data.whatsapp, 30),
 lastDonationAt: parsed.data.lastDonationAt,
 notes: parsed.data.notes ? sanitizeText(parsed.data.notes, 500) : undefined,
 consentListed: parsed.data.consentListed,
@@ -73,7 +76,7 @@ await createBloodRequest({
 requesterId: user.id,
 bloodGroup: parsed.data.bloodGroup,
 units: parsed.data.units,
-patient: parsed.data.patient,
+patient: sanitizeText(parsed.data.patient, 120),
 hospital: sanitizeText(parsed.data.hospital, 200),
 neededBy: parsed.data.neededBy,
     phone: sanitizeText(parsed.data.phone, 30),
@@ -90,7 +93,7 @@ revalidatePath("/blood-donation");
 return { success: "Your blood request has been submitted for review." }; }
 export async function cancelBloodRequestAction(requestId: string): Promise<{ cancelled: boolean }> {
 const user = await requireUser();
-const { data, error } = await insforge
+const { data, error } = await insforge.database
 .from("blood_requests")
 .update({ status: "cancelled", updated_at: new Date().toISOString() })
 .eq("id", requestId)
@@ -102,7 +105,7 @@ if (data?.length) revalidatePath("/blood-donation");
 return { cancelled: (data?.length ?? 0) > 0 }; }
 export async function releaseDonorContactAction(donorId: string) {
 const user = await requireUser();
-const { data: donor, error } = await insforge
+const { data: donor, error } = await insforge.database
 .from("blood_donors")
 .select("id,user_id,phone,whatsapp,blood_group,consent_listed,consent_contact,consent_expiry")
 .eq("id", donorId)
@@ -113,7 +116,7 @@ if (error || !donor) return null;
 const today = new Date().toISOString().slice(0, 10);
 const consentExpiry = new Date(donor.consent_expiry).toISOString().slice(0, 10);
 if (consentExpiry < today) return null;
-const { data: requests } = await insforge
+const { data: requests } = await insforge.database
 .from("blood_requests")
 .select("id")
 .eq("requester_id", user.id)
@@ -127,7 +130,7 @@ whatsapp: donor.whatsapp ?? donor.phone ?? null,
 }; }
 export async function releaseRequesterContactAction(requestId: string) {
 const user = await requireUser();
-const { data: request, error } = await insforge
+const { data: request, error } = await insforge.database
 .from("blood_requests")
 .select("*, profiles!inner(*)")
 .eq("id", requestId)
@@ -137,13 +140,13 @@ if (error || !request) return null;
 const requester = request.profiles;
 if (!requester?.phone) return null;
 const today = new Date().toISOString().slice(0, 10);
-const { data: donor } = await insforge
+const { data: donor } = await insforge.database
 .from("blood_donors")
 .select("id")
 .eq("user_id", user.id)
 .eq("consent_listed", true)
 .maybeSingle();
-const { data: viewerRequest } = await insforge
+const { data: viewerRequest } = await insforge.database
 .from("blood_requests")
 .select("id")
 .eq("requester_id", user.id)
@@ -165,7 +168,7 @@ return { error: "Invalid blood listing." };
 }
 let targetUserId: string | null = null;
 if (targetType === "donor") {
-const { data: donor } = await insforge
+const { data: donor } = await insforge.database
 .from("blood_donors")
 .select("user_id")
 .eq("id", targetId)
@@ -173,7 +176,7 @@ const { data: donor } = await insforge
 .single();
 targetUserId = donor?.user_id ?? null;
 } else {
-const { data: request } = await insforge
+const { data: request } = await insforge.database
 .from("blood_requests")
 .select("requester_id")
 .eq("id", targetId)
@@ -185,7 +188,7 @@ if (!targetUserId || targetUserId === user.id) {
 return { error: "This blood listing is no longer available for chat." };
 }
 // Check if conversation already exists
-const { data: existingConv } = await insforge
+const { data: existingConv } = await insforge.database
 .from("conversations")
 .select("id")
 .eq("conversation_type", "blood")
@@ -197,16 +200,16 @@ const { data: existingConv } = await insforge
 if (existingConv) {
 return { conversationId: existingConv.id };
 }
-const { data: conv, error } = await insforge
+const { data: conv, error } = await insforge.database
 .from("conversations")
-.insert({ participant_ids: [user.id, targetUserId], conversation_type: "blood", blood_target_type: targetType, blood_target_id: targetId })
+.insert([{ participant_ids: [user.id, targetUserId], conversation_type: "blood", blood_target_type: targetType, blood_target_id: targetId }])
 .select()
 .single();
 if (error) throw error;
 return { conversationId: conv.id }; }
 export async function getBloodChatMessagesAction(conversationId: string) {
 const user = await requireUser();
-const conversation = await insforge
+const conversation = await insforge.database
 .from("conversations")
 .select("*")
 .eq("id", conversationId)
@@ -214,7 +217,7 @@ const conversation = await insforge
 .filter("participant_ids", "cs", `{${user.id}}`)
 .single();
 if (!conversation) return { error: "You are not a participant in this conversation." };
-const { data: messages, error } = await insforge
+const { data: messages, error } = await insforge.database
 .from("messages")
 .select("*")
 .eq("conversation_id", conversationId)
@@ -223,19 +226,19 @@ if (error) throw error;
 return { messages: (messages ?? []).map((message: any) => ({ id: message.id, conversationId: message.conversation_id, senderId: message.sender_id, body: message.body, createdAt: message.created_at })) }; }
 export async function sendBloodChatMessageAction(conversationId: string, body: string) {
 const user = await requireUser();
-const { data: conversation } = await insforge.from("conversations").select("id").eq("id", conversationId).eq("conversation_type", "blood").filter("participant_ids", "cs", `{${user.id}}`).maybeSingle();
+const { data: conversation } = await insforge.database.from("conversations").select("id").eq("id", conversationId).eq("conversation_type", "blood").filter("participant_ids", "cs", `{${user.id}}`).maybeSingle();
 if (!conversation) return { error: "You are not a participant in this blood donation chat." };
 const parsed = messageSchema.safeParse({ body });
 if (!parsed.success) return { error: formatZodError(parsed.error) };
 const limit = rateLimit(`bloodchat:${user.id}`, RATES.bloodChatPerMinute, 60_000);
 if (!limit.ok) return { error: `Too many messages. Try again in ${limit.retryAfterSeconds}s.` };
-const { data: message, error } = await insforge
+const { data: message, error } = await insforge.database
 .from("messages")
-.insert({
+.insert([{
 conversation_id: conversationId,
 sender_id: user.id,
 body: sanitizeMultiline(parsed.data.body, 2000),
-})
+}])
 .select()
 .single();
 if (!message) return { error: "You are not a participant in this conversation." };

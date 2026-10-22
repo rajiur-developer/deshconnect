@@ -112,6 +112,8 @@ export async function insforgeGetDonorForUser(userId: string) {
     availability: data.availability,
     preferredContact: data.preferred_contact,
     contactValue: data.contact_value,
+    phone: data.phone ?? null,
+    whatsapp: data.whatsapp ?? null,
     lastDonationAt: data.last_donation_at,
     donationCount: data.donation_count,
     notes: data.notes,

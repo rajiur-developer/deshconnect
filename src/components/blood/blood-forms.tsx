@@ -1,23 +1,66 @@
 // @ts-nocheck
 "use client";
-import { useActionState } from "react";
+import { useActionState, useEffect, useState } from "react";
 import {
 createBloodRequestAction,
 registerDonorAction,
 type BloodFormState, } from "@/features/blood/actions"; import { BLOOD_GROUPS } from "@/lib/constants"; import { Button } from "@/components/ui/button"; import { Field, Input, Textarea } from "@/components/ui/input"; import { LocationFields } from "@/components/forms/location-fields"; import { useFormStateToast } from "@/components/ui/toast"; import type { DistrictOption, LocationOption, UpazilaOption } from "@/components/search/directory-filters";
+import { getDonationEligibility, isValidBloodDonationDate } from "@/lib/blood-donation";
+import type { DonorAvailability, ContactMethod } from "@/types/blood";
 type LocationProps = {
 divisions: LocationOption[];
 districts: DistrictOption[];
 upazilas: UpazilaOption[]; };
+type DonorProfile = {
+  bloodGroup?: string | null;
+  availability?: DonorAvailability | null;
+  preferredContact?: ContactMethod | null;
+  contactValue?: string | null;
+  phone?: string | null;
+  whatsapp?: string | null;
+  lastDonationAt?: string | null;
+  notes?: string | null;
+  divisionId?: string | null;
+  districtId?: string | null;
+  upazilaId?: string | null;
+  consentListed?: boolean;
+  consentContact?: boolean;
+};
 const selectClass = "w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm focus-ring";
-export function DonorForm({ divisions, districts, upazilas }: LocationProps) {
+function todayDate() {
+const now = new Date();
+return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")}`;
+}
+function cooldownLabel(remainingMs: number) {
+const hours = Math.ceil(remainingMs / (60 * 60 * 1000));
+const days = Math.floor(hours / 24);
+const remainingHours = hours % 24;
+if (days) return `${days} day${days === 1 ? "" : "s"}${remainingHours ? ` ${remainingHours} hr` : ""}`;
+return `${Math.max(1, remainingHours)} hour${remainingHours === 1 ? "" : "s"}`;
+}
+export function DonorForm({ divisions, districts, upazilas, profile }: LocationProps & { profile?: DonorProfile | null }) {
 const [state, formAction, pending] = useActionState<BloodFormState, FormData>(registerDonorAction, {});
+const [lastDonationAt, setLastDonationAt] = useState(profile?.lastDonationAt ?? "");
+const [availability, setAvailability] = useState<DonorAvailability>(() => {
+const eligible = profile?.lastDonationAt ? getDonationEligibility(profile.lastDonationAt)?.eligible : false;
+return profile?.availability === "available" && !eligible ? "busy" : profile?.availability ?? "busy";
+});
+const [now, setNow] = useState(Date.now());
 useFormStateToast(state);
+useEffect(() => {
+const timer = window.setInterval(() => setNow(Date.now()), 60_000);
+return () => window.clearInterval(timer);
+}, []);
+const eligibility = lastDonationAt ? getDonationEligibility(lastDonationAt, now) : null;
+const canDonate = Boolean(eligibility?.eligible);
+useEffect(() => {
+if (lastDonationAt && !canDonate && availability === "available") setAvailability("busy");
+}, [lastDonationAt, canDonate, availability]);
 return (
 <form action={formAction} className="space-y-4">
 <div className="grid gap-3 sm:grid-cols-2">
 <Field label="Blood group" htmlFor="bloodGroup" required>
-<select id="bloodGroup" name="bloodGroup" required className={selectClass}>
+<select id="bloodGroup" name="bloodGroup" defaultValue={profile?.bloodGroup ?? ""} required className={selectClass}>
 <option value="">Select group</option>
 {BLOOD_GROUPS.map((group) => (
 <option key={group} value={group}>{group}</option>
@@ -25,46 +68,54 @@ return (
 </select>
 </Field>
 <Field label="Availability" htmlFor="availability" required>
-<select id="availability" name="availability" defaultValue="available" className={selectClass}>
-<option value="available">Ready</option>
+<select id="availability" name="availability" value={availability} onChange={(event) => setAvailability(event.target.value as DonorAvailability)} required className={selectClass}>
+<option value="available" disabled={!canDonate}>Ready</option>
 <option value="busy">Busy</option>
 <option value="unavailable">Not available</option>
 </select>
 </Field>
+{lastDonationAt && eligibility && !eligibility.eligible && <p role="status" className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-900 sm:col-span-2">
+You can mark yourself Ready in <strong>{cooldownLabel(eligibility.remainingMs)}</strong> (75 days after your last donation).
+</p>}
+{lastDonationAt && !eligibility && <p role="alert" className="text-sm text-accent-600 sm:col-span-2">Enter a valid last donation date.</p>}
 <Field label="Preferred contact method" htmlFor="preferredContact" required>
-<select id="preferredContact" name="preferredContact" defaultValue="phone" className={selectClass}>
+<select id="preferredContact" name="preferredContact" defaultValue={profile?.preferredContact ?? "phone"} required className={selectClass}>
 <option value="phone">Phone</option>
 <option value="sms">SMS</option>
 <option value="email">Email</option>
 <option value="in-app">In-app</option>
 </select>
 </Field>
-<Field label="Phone number" htmlFor="phone" hint="Shown publicly on your donor card when you consent below.">
-<Input id="phone" name="phone" type="tel" placeholder="01712345678" required />
+<Field label="Phone number" htmlFor="phone" required hint="Shown publicly on your donor card when you consent below.">
+<Input id="phone" name="phone" type="tel" defaultValue={profile?.phone ?? ""} placeholder="01712345678" required />
 </Field>
-<Field label="WhatsApp number" htmlFor="whatsapp" hint="Shown publicly on your donor card when you consent below.">
-<Input id="whatsapp" name="whatsapp" type="tel" placeholder="01712345678" required />
+<Field label="WhatsApp number" htmlFor="whatsapp" required hint="Shown publicly on your donor card when you consent below.">
+<Input id="whatsapp" name="whatsapp" type="tel" defaultValue={profile?.whatsapp ?? ""} placeholder="01712345678" required />
 </Field>
-<Field label="Other contact info" htmlFor="contactValue" hint="Optional; useful for email or other contact methods.">
-<Input id="contactValue" name="contactValue" placeholder="name@example.com" />
+<Field label="Other contact info" htmlFor="contactValue" required hint="Enter an email or another way to reach you.">
+<Input id="contactValue" name="contactValue" defaultValue={profile?.contactValue ?? ""} placeholder="name@example.com" required />
 </Field>
 </div>
-<LocationFields divisions={divisions} districts={districts} upazilas={upazilas} current={{}} />
+<LocationFields idPrefix="donor-" divisions={divisions} districts={districts} upazilas={upazilas} current={{ divisionId: profile?.divisionId ?? undefined, districtId: profile?.districtId ?? undefined, upazilaId: profile?.upazilaId ?? undefined }} required />
 <div className="grid gap-3 sm:grid-cols-2">
-<Field label="Last donation date" htmlFor="lastDonationAt" hint="Optional">
-<Input id="lastDonationAt" name="lastDonationAt" type="date" />
+<Field label="Last donation date" htmlFor="lastDonationAt" required hint="Ready status becomes available 75 days after this date.">
+<Input id="lastDonationAt" name="lastDonationAt" type="date" value={lastDonationAt} max={todayDate()} onChange={(event) => {
+const value = event.target.value;
+setLastDonationAt(value);
+if (!isValidBloodDonationDate(value)) setAvailability((current) => current === "available" ? "busy" : current);
+}} required />
 </Field>
 <Field label="Notes" htmlFor="notes" hint="Optional">
-<Input id="notes" name="notes" placeholder="What donors should know" />
+<Input id="notes" name="notes" defaultValue={profile?.notes ?? ""} placeholder="What donors should know" />
 </Field>
 </div>
 <div className="space-y-2 rounded-xl border border-slate-200 bg-slate-50 p-4">
 <label className="flex items-start gap-2 text-sm text-slate-700">
-<input type="checkbox" name="consentListed" required className="mt-1" />
+<input type="checkbox" name="consentListed" defaultChecked={profile?.consentListed ?? false} required className="mt-1" />
 <span>I consent to my name being listed publicly as a blood donor.</span>
 </label>
 <label className="flex items-start gap-2 text-sm text-slate-700">
-<input type="checkbox" name="consentContact" required className="mt-1" />
+<input type="checkbox" name="consentContact" defaultChecked={profile?.consentContact ?? false} required className="mt-1" />
 <span>I consent to showing my phone and WhatsApp numbers publicly on my donor card.</span>
 </label>
 </div>
@@ -104,13 +155,13 @@ return (
 </div>
 <div className="grid gap-3 sm:grid-cols-2">
 <Field label="Date needed" htmlFor="neededBy" required>
-<Input id="neededBy" name="neededBy" type="date" required />
+<Input id="neededBy" name="neededBy" type="date" min={todayDate()} required />
 </Field>
-<Field label="Patient name" htmlFor="patient" hint="Optional">
-<Input id="patient" name="patient" placeholder="Patient" />
+<Field label="Patient name" htmlFor="patient" required>
+<Input id="patient" name="patient" placeholder="Patient" required />
 </Field>
 </div>
-<LocationFields divisions={divisions} districts={districts} upazilas={upazilas} current={{}} />
+<LocationFields idPrefix="request-" divisions={divisions} districts={districts} upazilas={upazilas} current={{}} required />
 <Field label="Additional info" htmlFor="req-notes" hint="Optional">
 <Textarea id="req-notes" name="notes" placeholder="Ward, doctor or other details" />
 </Field>

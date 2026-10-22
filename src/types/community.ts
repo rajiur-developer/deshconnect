@@ -48,10 +48,14 @@ conversationId: string;
 senderId: string;
 body: string;
 readBy: string[];
+deliveredTo?: string[];
+editedAt?: string | null;
 attachmentKey?: string | null;
 attachmentUrl?: string | null;
 attachmentMimeType?: string | null;
 attachmentType?: "image" | "audio" | null;
+replyToMessageId?: string | null;
+reactions?: Array<{ userId: string; emoji: string }>;
 createdAt: string; }
 export interface Notification {
 id: string;

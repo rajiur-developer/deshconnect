@@ -2,6 +2,7 @@
 "use client";
 import Link from "next/link"; import { useActionState, useState } from "react";
 import { googleOAuthAction, loginAction, type FormState } from "@/features/auth/actions"; import { Button } from "@/components/ui/button"; import { Field, Input } from "@/components/ui/input"; import { Icon } from "@/components/ui/icons"; import { useFormStateToast } from "@/components/ui/toast";
+import { Spinner } from "@/components/ui/spinner"; import { FormPendingButton } from "@/components/ui/form-pending-button";
 export function LoginForm({ next, oauthError }: { next: string; oauthError?: string }) {
 const [state, formAction, pending] = useActionState<FormState, FormData>(loginAction, {});
 useFormStateToast(state);
@@ -39,9 +40,9 @@ aria-label={showPassword ? "Hide password" : "Show password"}
 </div>
 </Field>
 </div>
-{state.error && <p role="alert" className="mt-4 rounded-lg bg-accent-500/10 px-3 py-2 text-sm text-accent-600">{state.error}</p>}
+{state.error && <p role="alert" className="motion-error mt-4 rounded-lg bg-accent-500/10 px-3 py-2 text-sm text-accent-600">{state.error}</p>}
 <div className="mt-6">
-<Button type="submit" className="w-full" disabled={pending}>{pending ? "Logging in…" : "Log in"}</Button>
+<Button type="submit" className="w-full" disabled={pending} aria-busy={pending}>{pending && <Spinner />}{pending ? "Logging in…" : "Log in"}</Button>
 </div>
 <div className="mt-4 flex items-center justify-between text-sm">
 <Link href="/forgot-password" className="text-brand-700 hover:text-brand-800">Forgot password?</Link>
@@ -49,5 +50,5 @@ aria-label={showPassword ? "Hide password" : "Show password"}
 </div>
 </form>
 <div className="my-4 flex items-center gap-3 text-xs text-slate-400"><span className="h-px flex-1 bg-slate-200" />or continue with<span className="h-px flex-1 bg-slate-200" /></div>
-<form action={googleOAuthAction}><Button type="submit" variant="outline" className="w-full">Continue with Google</Button></form>
+<form action={googleOAuthAction}><FormPendingButton variant="outline" className="w-full" pendingLabel="Connecting to Google…">Continue with Google</FormPendingButton></form>
 </div>); }

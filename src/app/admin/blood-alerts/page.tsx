@@ -1,12 +1,9 @@
 // @ts-nocheck
-import { getDatabase } from "@/lib/db/store"; import { PageHeader } from "@/components/layout/page-header"; import { EmergencyAlertForm } from "@/components/admin/emergency-alert-form"; import { Badge, Card } from "@/components/ui/badge"; import { formatDate } from "@/lib/utils";
+import { insforgeSelectMany } from "@/lib/insforge"; import { mapDbRow } from "@/lib/db/insforge"; import { PageHeader } from "@/components/layout/page-header"; import { EmergencyAlertForm } from "@/components/admin/emergency-alert-form"; import { Badge, Card } from "@/components/ui/badge"; import { formatDate } from "@/lib/utils";
 export const metadata = { title: "Emergency Blood Alerts" };
 export default async function AdminBloodAlertsPage() {
-const db = await getDatabase();
-const alerts = db.bloodRequests
-.filter((request) => request.status === "active")
-.sort((a, b) => b.createdAt.localeCompare(a.createdAt))
-.slice(0, 10);
+const { data } = await insforgeSelectMany("blood_requests", { status: "eq.active", order: "created_at.desc", limit: "10" });
+const alerts = mapDbRow(data || []);
 return (
 <>
 <PageHeader

@@ -8,6 +8,7 @@ adminSetBusinessStatusAction,
 adminSetPlaceStatusAction,
 adminSetServiceStatusAction,
 deleteBusinessAction, } from "@/features/admin/actions"; import { useToast } from "@/components/ui/toast";
+import { AnimatedDialog } from "@/components/ui/animated-dialog";
 /**
 * Hide / Update / Delete controls for a directory record. "Update" opens the
 * supplied edit form in a modal. Success and failure are shown as pop-ups.
@@ -82,18 +83,6 @@ className="rounded-lg border border-accent-500/40 px-2 py-1 text-xs font-medium 
 Delete
 </button>
 </div>
-{editing && children && (
-<div
-className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 p-4"
-onClick={() => setEditing(false)}
->
-<div
-className="max-h-[90vh] w-full max-w-2xl overflow-y-auto rounded-2xl bg-white p-6"
-onClick={(event) => event.stopPropagation()}
->
-{children}
-</div>
-</div>
-)}
+{children && <AnimatedDialog open={editing} onClose={() => setEditing(false)} label={`Update ${entity}`} panelClassName="max-w-2xl">{children}</AnimatedDialog>}
 </>
 ); }

@@ -1,6 +1,7 @@
 // @ts-nocheck
 
 import { z } from "zod";
+import { getDonationEligibility, isValidBloodDonationDate } from "@/lib/blood-donation";
 
 const BD_PHONE = /^(?:\+?880|0)1[3-9]\d{8}$/;
 const BLOOD_GROUP_VALUES = ["A+", "A-", "B+", "B-", "AB+", "AB-", "O+", "O-"] as const;
@@ -74,37 +75,41 @@ const phoneNumberSchema = z.string().trim().min(1, "Enter a valid phone number")
 export const bloodRequestSchema = z.object({
   bloodGroup: z.string().min(1, "Blood group is required"),
   units: z.coerce.number().min(1, "Units must be at least 1").max(20, "Units must be at most 20"),
-  patient: z.string().optional(),
+  patient: z.string().trim().min(1, "Patient name is required"),
   hospital: z.string().min(1, "Hospital name is required"),
-  neededBy: z.string().min(1, "Needed by date is required"),
+  neededBy: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Enter a valid date").refine((value) => {
+    const date = new Date(`${value}T00:00:00.000Z`);
+    return !Number.isNaN(date.getTime()) && date.toISOString().slice(0, 10) === value && date.getTime() >= new Date(new Date().toISOString().slice(0, 10)).getTime();
+  }, "Needed by date cannot be in the past"),
   phone: phoneNumberSchema,
   whatsapp: phoneNumberSchema,
   notes: z.string().optional(),
-  divisionId: z.string().optional(),
-  districtId: z.string().optional(),
-  upazilaId: z.string().optional(),
+  divisionId: z.string().min(1, "Division is required"),
+  districtId: z.string().min(1, "District is required"),
+  upazilaId: z.string().min(1, "Upazila is required"),
 });
 
 export const donorSchema = z.object({
   bloodGroup: z.string().min(1, "Blood group is required"),
-  availability: z.string().min(1, "Availability is required"),
-  preferredContact: z.string().min(1, "Preferred contact method is required"),
-  contactValue: z.string().trim().optional(),
-  phone: phoneNumberSchema.optional(),
-  whatsapp: phoneNumberSchema.optional(),
-  lastDonationAt: z.string().optional(),
+  availability: z.enum(["available", "busy", "unavailable"], "Choose a valid availability"),
+  preferredContact: z.enum(["phone", "sms", "email", "in-app"], "Choose a preferred contact method"),
+  contactValue: z.string().trim().min(1, "Other contact information is required").max(200),
+  phone: phoneNumberSchema,
+  whatsapp: phoneNumberSchema,
+  lastDonationAt: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Last donation date is required").refine(isValidBloodDonationDate, "Enter a valid last donation date that is not in the future"),
   notes: z.string().optional(),
-  divisionId: z.string().optional(),
-  districtId: z.string().optional(),
-  upazilaId: z.string().optional(),
+  divisionId: z.string().min(1, "Division is required"),
+  districtId: z.string().min(1, "District is required"),
+  upazilaId: z.string().min(1, "Upazila is required"),
   consentListed: z.coerce.boolean(),
   consentContact: z.coerce.boolean(),
 }).superRefine((data, ctx) => {
-  if (!data.contactValue && !data.phone && !data.whatsapp) {
+  const eligibility = getDonationEligibility(data.lastDonationAt);
+  if (data.availability === "available" && !eligibility?.eligible) {
     ctx.addIssue({
       code: z.ZodIssueCode.custom,
-      path: ["contactValue"],
-      message: "Enter a phone number, WhatsApp number, or other contact info.",
+      path: ["availability"],
+      message: "You can mark yourself Ready only 75 days after your last donation.",
     });
   }
 });

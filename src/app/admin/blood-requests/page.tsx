@@ -1,10 +1,10 @@
 // @ts-nocheck
-import { getDatabase } from "@/lib/db/store"; import { Badge, Card } from "@/components/ui/badge"; import { PageHeader } from "@/components/layout/page-header"; import { BloodRequestStatusSelect } from "@/components/admin/admin-client"; import { formatDate } from "@/lib/utils";
+import { insforgeSelectMany } from "@/lib/insforge"; import { mapDbRow } from "@/lib/db/insforge"; import { listAdminUsers } from "@/services/users"; import { Badge, Card } from "@/components/ui/badge"; import { PageHeader } from "@/components/layout/page-header"; import { BloodRequestStatusSelect } from "@/components/admin/admin-client"; import { formatDate } from "@/lib/utils";
 export const metadata = { title: "Blood Requests" };
 export default async function AdminBloodRequestsPage() {
-const db = await getDatabase();
-const userById = new Map(db.users.map((user) => [user.id, user]));
-const requests = [...db.bloodRequests].sort((a, b) => a.neededBy.localeCompare(b.neededBy));
+const [{ data }, users] = await Promise.all([insforgeSelectMany("blood_requests", { order: "needed_by.asc", limit: "500" }), listAdminUsers()]);
+const userById = new Map(users.map((user) => [user.id, user]));
+const requests = mapDbRow(data || []);
 return (
 <>
 <PageHeader title="Blood Requests" description="Review blood requests and manage their statuses." />

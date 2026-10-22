@@ -2,6 +2,7 @@
 "use client";
 import { useActionState, useState, useTransition } from "react"; import { useRouter } from "next/navigation";
 import { adminDeleteUserAction, adminSetUserStatusAction, adminUpdateUserAction, type AdminFormState } from "@/features/admin/actions"; import { Button } from "@/components/ui/button"; import { Field, Input } from "@/components/ui/input"; import { useFormStateToast, useToast } from "@/components/ui/toast"; import type { User } from "@/types/auth";
+import { AnimatedDialog } from "@/components/ui/animated-dialog";
 /** Delete / Block / Update controls for a member, shown on the admin users page. */ export function UserActions({ user }: { user: User }) {
 const [editing, setEditing] = useState(false);
 const [pending, startTransition] = useTransition();
@@ -52,16 +53,9 @@ className="rounded-lg border border-accent-500/40 px-2 py-1 text-xs font-medium 
 Delete
 </button>
 </div>
-{editing && (
-<div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 p-4" onClick={() => setEditing(false)}>
-<div
-className="max-h-[90vh] w-full max-w-xl overflow-y-auto rounded-2xl bg-white p-6"
-onClick={(event) => event.stopPropagation()}
->
-<UserEditForm user={user} onDone={() => setEditing(false)} />
-</div>
-</div>
-)}
+<AnimatedDialog open={editing} onClose={() => setEditing(false)} label="Update user" panelClassName="max-w-xl">
+{(close) => <UserEditForm user={user} onDone={close} />}
+</AnimatedDialog>
 </>
 ); }
 export function UserEditForm({ user, onDone }: { user: User; onDone?: () => void }) {

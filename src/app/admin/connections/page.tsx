@@ -1,5 +1,5 @@
 // @ts-nocheck
-import { getDatabase } from "@/lib/db/store"; import { Badge, Card } from "@/components/ui/badge"; import { PageHeader } from "@/components/layout/page-header"; import { formatDate } from "@/lib/utils";
+import { insforgeSelectMany } from "@/lib/insforge"; import { mapDbRow } from "@/lib/db/insforge"; import { listAdminUsers } from "@/services/users"; import { Badge, Card } from "@/components/ui/badge"; import { PageHeader } from "@/components/layout/page-header"; import { formatDate } from "@/lib/utils";
 export const metadata = { title: "Connections" };
 const TONE: Record<string, "success" | "amber" | "neutral" | "accent"> = {
 accepted: "success",
@@ -7,8 +7,9 @@ pending: "amber",
 rejected: "neutral",
 cancelled: "accent", };
 export default async function AdminConnectionsPage() {
-const db = await getDatabase();
-const userById = new Map(db.users.map((user) => [user.id, user]));
+const [{ data }, users] = await Promise.all([insforgeSelectMany("connections", { order: "updated_at.desc", limit: "500" }), listAdminUsers()]);
+const connections = mapDbRow(data || []);
+const userById = new Map(users.map((user) => [user.id, user]));
 return (
 <>
 <PageHeader title="Connections" description="Handle connection-related reports or abuse." />
@@ -23,7 +24,7 @@ return (
 </tr>
 </thead>
 <tbody className="divide-y divide-slate-100">
-{db.connections.map((connection) => (
+{connections.map((connection) => (
 <tr key={connection.id}>
 <td className="px-4 py-3 text-slate-600">{userById.get(connection.requesterId)?.fullName ?? connection.requesterId}</td>
 <td className="px-4 py-3 text-slate-600">{userById.get(connection.addresseeId)?.fullName ?? connection.addresseeId}</td>

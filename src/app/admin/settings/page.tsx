@@ -1,17 +1,17 @@
 // @ts-nocheck
-import { getDatabase } from "@/lib/db/store"; import { PageHeader } from "@/components/layout/page-header"; import { SettingsForm } from "@/components/admin/admin-client";
+import { insforgeSelectOne } from "@/lib/insforge"; import { PageHeader } from "@/components/layout/page-header"; import { SettingsForm } from "@/components/admin/admin-client";
 export const metadata = { title: "Admin Settings" };
 export default async function AdminSettingsPage() {
-const db = await getDatabase();
+const settings = await insforgeSelectOne("platform_settings", { id: "eq.platform" }).catch(() => null);
 return (
 <>
 <PageHeader title="Admin Settings" description="Manage website configuration and administrative settings." />
 <SettingsForm
 initial={{
-siteName: db.settings.siteName,
-allowPublicPosts: db.settings.allowPublicPosts,
-requireNewsApproval: db.settings.requireNewsApproval,
-donorDirectoryEnabled: db.settings.donorDirectoryEnabled,
+siteName: settings?.site_name ?? "DeshConnect",
+allowPublicPosts: settings?.allow_public_posts ?? true,
+requireNewsApproval: settings?.require_news_approval ?? true,
+donorDirectoryEnabled: settings?.donor_directory_enabled ?? true,
 }}
 />
 </>

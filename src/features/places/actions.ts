@@ -4,20 +4,20 @@ import { revalidatePath } from "next/cache";
 import { requireUser } from "@/lib/auth/current-user"; import { insforge } from "@/lib/insforge"; import { mapDbRow } from "@/lib/db/insforge"; import { formatZodError, reviewSchema } from "@/lib/validation/schemas"; import { rateLimit } from "@/lib/security/rate-limit"; import { RATES } from "@/lib/constants";
 export async function toggleSaveAction(placeId: string): Promise<{ saved: boolean }> {
 const user = await requireUser();
-const existing = await insforge
+const existing = await insforge.database
 .from("saved_places")
 .select("id")
 .eq("user_id", user.id)
 .eq("place_id", placeId)
 .maybeSingle();
 if (existing?.data) {
-const { error } = await insforge.from("saved_places").delete().eq("user_id", user.id).eq("place_id", placeId);
+const { error } = await insforge.database.from("saved_places").delete().eq("user_id", user.id).eq("place_id", placeId);
 if (error) throw error;
 revalidatePath("/saved");
 revalidatePath(`/places/${placeId}`);
 return { saved: false };
 } else {
-const { error } = await insforge.from("saved_places").insert({ user_id: user.id, place_id: placeId });
+const { error } = await insforge.database.from("saved_places").insert([{ user_id: user.id, place_id: placeId }]);
 if (error) throw error;
 revalidatePath("/saved");
 revalidatePath(`/places/${placeId}`);
@@ -40,16 +40,16 @@ const limit = rateLimit(`review:${user.id}`, RATES.postPerMinute, 60_000);
 if (!limit.ok) {
 return { error: `Too many reviews. Try again in ${limit.retryAfterSeconds}s.` };
 }
-const { data, error } = await insforge
+const { data, error } = await insforge.database
 .from("reviews")
-.insert({
+.insert([{
 place_id: placeId,
 author_id: user.id,
 rating: parsed.data.rating,
 title: parsed.data.title,
 body: parsed.data.body,
 status: "visible",
-})
+}])
 .select()
 .single();
 if (error) throw error;

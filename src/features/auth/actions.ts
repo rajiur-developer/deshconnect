@@ -1,6 +1,6 @@
 "use server";
 
-import { cookies } from "next/headers";
+import { cookies, headers } from "next/headers";
 import { redirect } from "next/navigation";
 import { createAuthActions, createServerClient } from "@insforge/sdk/ssr";
 import { revalidatePath } from "next/cache";
@@ -43,7 +43,9 @@ function auth() {
 async function freshAuth() {
   const cookieStore = await cookies();
   return {
-    actions: createAuthActions({ responseCookies: cookieStore }),
+    // Server Actions use the same writable cookie store for reading and
+    // writing; responseCookies is reserved for Route Handler responses.
+    actions: createAuthActions({ cookies: cookieStore }),
     cookieStore,
   };
 }
@@ -95,11 +97,20 @@ export async function loginAction(_prev: FormState, formData: FormData): Promise
   const { email, password, next } = parsed.data;
   const limit = rateLimit(`login:${email}`, RATES.loginPerMinute, 60_000);
   if (!limit.ok) return { error: `Too many attempts. Try again in ${limit.retryAfterSeconds}s.` };
-  const { actions } = await freshAuth();
-  const { data, error } = await actions.signInWithPassword({ email, password });
+  let signInResult;
+  try {
+    const { actions } = await freshAuth();
+    signInResult = await actions.signInWithPassword({ email, password });
+  } catch (cause) {
+    console.error("Sign-in request failed before returning an auth result.", cause instanceof Error ? cause.name : "Unknown error");
+    return { error: "We could not reach the sign-in service. Please try again." };
+  }
+  const { data, error } = signInResult;
   if (error || !data?.user) return { error: error?.message ?? "Unable to sign in. Please try again." };
   revalidatePath("/", "layout");
-  redirect(safeNext(formData.get("next")) || next);
+  const destination = new URL(safeNext(formData.get("next")) || next, appUrl());
+  destination.searchParams.set("welcome", "1");
+  redirect(`${destination.pathname}${destination.search}${destination.hash}`);
 }
 
 export async function registerAction(_prev: FormState, formData: FormData): Promise<FormState> {
@@ -115,8 +126,18 @@ export async function registerAction(_prev: FormState, formData: FormData): Prom
   const data = parsed.data;
   const limit = rateLimit(`register:${data.email}`, RATES.registerPerHour, 60 * 60_000);
   if (!limit.ok) return { error: `Too many registrations. Try again in ${limit.retryAfterSeconds}s.` };
-  const { actions, cookieStore } = await freshAuth();
-  const { data: response, error } = await actions.signUp({ email: data.email, password: data.password, name: data.fullName });
+  let actions: Awaited<ReturnType<typeof freshAuth>>["actions"];
+  let cookieStore: Awaited<ReturnType<typeof freshAuth>>["cookieStore"];
+  let response: Awaited<ReturnType<typeof actions.signUp>>["data"];
+  let signUpError: Awaited<ReturnType<typeof actions.signUp>>["error"];
+  try {
+    ({ actions, cookieStore } = await freshAuth());
+    ({ data: response, error: signUpError } = await actions.signUp({ email: data.email, password: data.password, name: data.fullName }));
+  } catch (cause) {
+    console.error("Registration request failed before returning an auth result.", cause instanceof Error ? cause.name : "Unknown error");
+    return { error: "We could not reach the registration service. Please try again." };
+  }
+  const error = signUpError;
   if (error) return { error: error.message };
   if (response?.requireEmailVerification) return {
     ...profileFields(formData), email: data.email, verificationRequired: true,
@@ -133,7 +154,7 @@ export async function registerAction(_prev: FormState, formData: FormData): Prom
     return { error: "Your account was created, but we could not finish setting up your profile. Please log in and try again." };
   }
   revalidatePath("/", "layout");
-  redirect("/dashboard");
+  redirect("/dashboard?welcome=1");
 }
 
 export async function verifyRegistrationAction(_prev: FormState, formData: FormData): Promise<FormState> {
@@ -150,7 +171,7 @@ export async function verifyRegistrationAction(_prev: FormState, formData: FormD
     return { error: "Your email is verified, but we could not finish setting up your profile. Please log in to continue." };
   }
   revalidatePath("/", "layout");
-  redirect("/dashboard");
+  redirect("/dashboard?welcome=1");
 }
 
 export async function resendRegistrationCodeAction(_prev: FormState, formData: FormData): Promise<FormState> {
@@ -163,12 +184,25 @@ export async function resendRegistrationCodeAction(_prev: FormState, formData: F
 }
 
 export async function googleOAuthAction(): Promise<void> {
-  const store = await cookies();
-  const actions = createAuthActions({ cookies: store });
-  const { data, error } = await actions.signInWithOAuth("google", {
-    redirectTo: new URL("/api/auth/callback", appUrl()).toString(),
-    skipBrowserRedirect: true,
-  });
+  let store: Awaited<ReturnType<typeof cookies>>;
+  let data: Awaited<ReturnType<ReturnType<typeof createAuthActions>["signInWithOAuth"]>>["data"];
+  let error: Awaited<ReturnType<ReturnType<typeof createAuthActions>["signInWithOAuth"]>>["error"];
+  try {
+    store = await cookies();
+    const requestHeaders = await headers();
+    const requestHost = requestHeaders.get("x-forwarded-host") ?? requestHeaders.get("host");
+    const redirectBase = process.env.NODE_ENV !== "production" && requestHost
+      ? `${requestHeaders.get("x-forwarded-proto") ?? "http"}://${requestHost}`
+      : appUrl();
+    const actions = createAuthActions({ cookies: store });
+    ({ data, error } = await actions.signInWithOAuth("google", {
+      redirectTo: new URL("/api/auth/callback", redirectBase).toString(),
+      skipBrowserRedirect: true,
+    }));
+  } catch (cause) {
+    console.error("Google OAuth request failed before returning an auth result.", cause instanceof Error ? cause.name : "Unknown error");
+    redirect("/login?error=oauth_unavailable");
+  }
   if (error || !data?.url || !data.codeVerifier) redirect("/login?error=oauth_unavailable");
   store.set("insforge_code_verifier", data.codeVerifier, {
     httpOnly: true, secure: process.env.NODE_ENV === "production", sameSite: "lax", path: "/", maxAge: 600,

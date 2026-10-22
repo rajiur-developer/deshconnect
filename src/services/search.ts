@@ -1,6 +1,12 @@
 // @ts-nocheck
 import type { Business, GovernmentService, Institution, News, Place } from "@/types/content"; import type { Post } from "@/types/community";
-import { getDatabase } from "@/lib/db/store";
+import { listPlaces } from "@/services/places";
+import { listInstitutions } from "@/services/institutions";
+import { listBusinesses } from "@/services/businesses";
+import { listGovernmentServices } from "@/services/government-services";
+import { listNews } from "@/services/news";
+import { insforgeSelectMany } from "@/lib/insforge";
+import { mapDbRow } from "@/lib/db/insforge";
 export type GlobalSearchResults = {
 places: Place[];
 institutions: Institution[];
@@ -21,24 +27,12 @@ const needles = buildNeedles(query);
 if (!needles.length) {
 return { places: [], institutions: [], businesses: [], governmentServices: [], news: [], posts: [] };
 }
-const db = await getDatabase();
-return {
-places: db.places
-.filter((item) => item.status === "published" && matches([item.name, item.summary, item.description, item.address, item.category], needles))
-.slice(0, limit),
-institutions: db.institutions
-.filter((item) => item.status === "published" && matches([item.name, item.description, item.address, item.category], needles))
-.slice(0, limit),
-businesses: db.businesses
-.filter((item) => item.status === "published" && matches([item.name, item.description, item.address, item.category], needles))
-.slice(0, limit),
-governmentServices: db.governmentServices
-.filter((item) => item.status === "published" && matches([item.name, item.description, item.officeAddress, item.category], needles))
-.slice(0, limit),
-news: db.news
-.filter((item) => item.status === "published" && matches([item.title, item.excerpt, item.category], needles))
-.slice(0, limit),
-posts: db.posts
-.filter((item) => item.status === "visible" && matches([item.body], needles))
-.slice(0, limit),
-}; }
+const [places, institutions, businesses, governmentServices, news, postRows] = await Promise.all([
+listPlaces({ q: query, page: 1, pageSize: limit }),
+listInstitutions({ q: query, page: 1, pageSize: limit }),
+listBusinesses({ q: query, page: 1, pageSize: limit }),
+listGovernmentServices({ q: query, page: 1, pageSize: limit }),
+listNews({ q: query, page: 1, pageSize: limit }),
+insforgeSelectMany("posts", { status: "eq.visible", body: `ilike.*${query.trim().replace(/[(),%_*]/g, " ").replace(/\s+/g, " ")}*`, order: "created_at.desc", limit: String(limit) }),
+]);
+return { places: places.items, institutions: institutions.items, businesses: businesses.items, governmentServices: governmentServices.items, news: news.items, posts: mapDbRow(postRows.data || []) }; }

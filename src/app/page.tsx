@@ -1,7 +1,6 @@
-// @ts-nocheck
 import Link from "next/link";
 import type { ReactNode } from "react";
-import { CATEGORY_SHORTCUTS, SITE } from "@/config/site"; import { listBloodRequests, listPublicDonors } from "@/services/blood"; import { listGovernmentServices } from "@/services/government-services"; import { listInstitutions } from "@/services/institutions"; import { featuredPlaces } from "@/services/places"; import { listDivisions } from "@/services/locations"; import { listNews } from "@/services/news"; import { listPosts } from "@/services/community"; import { getCurrentUser } from "@/lib/auth/current-user"; import { Badge, Section } from "@/components/ui/badge"; import { CategoryCard } from "@/components/cards/category-card"; import { InstitutionCard } from "@/components/cards/institution-card"; import { NewsCard } from "@/components/cards/news-card"; import { PlaceCard } from "@/components/cards/place-card"; import { BloodRequestCard } from "@/components/blood/blood-request-card"; import { DonorCard } from "@/components/blood/donor-card"; import { Icon } from "@/components/ui/icons"; import { HeroSearch } from "@/components/search/hero-search"; import { ListGrid } from "@/components/layout/list-grid";
+import { CATEGORY_SHORTCUTS, SITE } from "@/config/site"; import { listBloodRequests, listPublicDonors } from "@/services/blood"; import { listGovernmentServices } from "@/services/government-services"; import { listInstitutions } from "@/services/institutions"; import { featuredPlaces } from "@/services/places"; import { listDivisions } from "@/services/locations"; import { listNews } from "@/services/news"; import { listPosts } from "@/services/community"; import { getCurrentUser } from "@/lib/auth/current-user"; import { Badge, Section } from "@/components/ui/badge"; import { CategoryCard } from "@/components/cards/category-card"; import { InstitutionCard } from "@/components/cards/institution-card"; import { NewsCard } from "@/components/cards/news-card"; import { PlaceCard } from "@/components/cards/place-card"; import { BloodRequestCard } from "@/components/blood/blood-request-card"; import { DonorCard } from "@/components/blood/donor-card"; import { Icon } from "@/components/ui/icons"; import { HeroSearch } from "@/components/search/hero-search"; import { ListGrid } from "@/components/layout/list-grid"; import { VideoBackground } from "@/components/layout/video-background";
 export const metadata = {
 title: SITE.name,
 description: SITE.description, };
@@ -35,16 +34,14 @@ return (
 <>
 {/* Hero */}
 <section className="relative isolate overflow-hidden bg-brand-950">
-<video className="absolute inset-0 h-full w-full object-cover" autoPlay muted loop playsInline preload="metadata">
-<source src="/images/banner/homePage.mp4" type="video/mp4" />
-</video>
+<VideoBackground src="/images/banner/homePage.mp4" className="bg-brand-950" />
 <div className="absolute inset-0 bg-gradient-to-b from-brand-950/55 via-brand-900/50 to-brand-950/75" />
-<div className="container-x relative flex min-h-[70vh] flex-col items-center justify-center py-16 sm:min-h-[80vh] sm:py-20">
+<div className="container-x relative flex min-h-[60vh] flex-col items-center justify-center py-12 sm:py-16">
 <div className="enter-fade mx-auto max-w-3xl text-center">
 <Badge tone="accent" className="bg-white/15 text-white ring-white/20">
-Bangladesh's information and community platform             </Badge>             <h1 className="mt-4 text-3xl font-bold text-white sm:text-5xl">               Bangladesh's places, services, blood donation, hospitals, emergency services, all information and people search —<br/> all in one place.
-</h1>
-<p className="mt-4 text-lg text-brand-50">
+Bangladesh's information and community platform             </Badge>             <h2 className="mt-4 text-2xl font-bold text-white sm:text-4xl">               Find places, services, blood donors, hospitals, emergency help, and people across Bangladesh <br/> all in one place.
+</h2>
+<p className="mt-4 text-sm text-brand-50">
 Search places, blood donation, blood request, educational institutions, hospitals, businesses and government services by division, district and upazila.
 </p>
 <div className="mt-8">

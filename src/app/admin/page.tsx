@@ -1,22 +1,30 @@
 // @ts-nocheck
 import Link from "next/link";
-import { getDatabase } from "@/lib/db/store"; import { listAuditLogs } from "@/services/audit"; import { listNews } from "@/services/news"; import { formatDate } from "@/lib/utils"; import { Badge, Card } from "@/components/ui/badge"; import { PageHeader } from "@/components/layout/page-header";
+import { insforgeSelectMany } from "@/lib/insforge"; import { listAdminUsers } from "@/services/users"; import { listAuditLogs } from "@/services/audit"; import { listNews } from "@/services/news"; import { formatDate } from "@/lib/utils"; import { Badge, Card } from "@/components/ui/badge"; import { PageHeader } from "@/components/layout/page-header";
 export const metadata = { title: "Admin Dashboard" };
 export default async function AdminDashboardPage() {
-const [db, logs, newsResult] = await Promise.all([getDatabase(), listAuditLogs(10), listNews({ includeAll: true, page: 1, pageSize: 500 })]);
+const [users, logs, newsResult, places, institutions, businesses, reports, donors, requests] = await Promise.all([
+listAdminUsers(), listAuditLogs(10), listNews({ includeAll: true, page: 1, pageSize: 500 }),
+insforgeSelectMany("places", { limit: "1" }).then((r) => r.count),
+insforgeSelectMany("institutions", { limit: "1" }).then((r) => r.count),
+insforgeSelectMany("businesses", { limit: "1" }).then((r) => r.count),
+insforgeSelectMany("reports", { status: "eq.open", limit: "1" }).then((r) => r.count),
+insforgeSelectMany("blood_donors", { limit: "1" }).then((r) => r.count),
+insforgeSelectMany("blood_requests", { status: "eq.active", limit: "1" }).then((r) => r.count),
+]);
 const news = newsResult.items;
-const moderators = db.users.filter((item) => item.role === "moderator");
+const moderators = users.filter((item) => item.role === "moderator");
 const counts = [
-{ label: "Users", value: db.users.length, href: "/admin/users" },
+{ label: "Users", value: users.length, href: "/admin/users" },
 { label: "Moderators", value: moderators.length, href: "/admin/users" },
-{ label: "Places", value: db.places.length, href: "/admin/places" },
-{ label: "Institutions", value: db.institutions.length, href: "/admin/places" },
-{ label: "Businesses", value: db.businesses.length, href: "/admin/businesses" },
+{ label: "Places", value: places, href: "/admin/places" },
+{ label: "Institutions", value: institutions, href: "/admin/places" },
+{ label: "Businesses", value: businesses, href: "/admin/businesses" },
 { label: "News", value: news.length, href: "/admin/news?view=all" },
 { label: "Pending news", value: news.filter((item) => item.status === "pending_review").length, href: "/admin/news?view=requests" },
-{ label: "Open reports", value: db.reports.filter((item) => item.status === "open").length, href: "/admin/reports" },
-{ label: "Donors", value: db.donors.length, href: "/admin/blood-donors" },
-{ label: "Blood requests", value: db.bloodRequests.filter((item) => item.status === "active").length, href: "/admin/blood-requests" },
+{ label: "Open reports", value: reports, href: "/admin/reports" },
+{ label: "Donors", value: donors, href: "/admin/blood-donors" },
+{ label: "Blood requests", value: requests, href: "/admin/blood-requests" },
 ];
 return (
 <>

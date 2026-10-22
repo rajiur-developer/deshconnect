@@ -2,6 +2,7 @@
 import "server-only";
 
 import { insforgeGet, insforgeInsert, insforgeUpdate, insforgeDelete, insforgeSelectOne, insforgeSelectMany } from "@/lib/insforge";
+import { insforge } from "@/lib/insforge";
 
 export async function insforgeListConversations(userId: string) {
   const { data } = await insforgeSelectMany("conversations", { participant_ids: `cs.{${userId}}`, conversation_type: "eq.connection" });
@@ -10,6 +11,49 @@ export async function insforgeListConversations(userId: string) {
     participantIds: r.participant_ids,
     updatedAt: r.updated_at,
   }));
+}
+
+export async function listUnreadMessageCounts() {
+  const { data, error } = await insforge.database.rpc("get_unread_message_counts");
+  if (error) throw error;
+  return (data ?? []).map((row: any) => ({
+    conversationId: row.conversation_id,
+    count: Number(row.unread_count ?? 0),
+  }));
+}
+
+export type ConversationPreview = {
+  id: string;
+  conversationId: string;
+  senderId: string;
+  body: string;
+  attachmentType: "image" | "audio" | null;
+  createdAt: string;
+};
+
+export async function listConversationPreviews(conversationIds: string[]): Promise<ConversationPreview[]> {
+  const ids = [...new Set(conversationIds.filter((id) => /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id)))];
+  if (ids.length === 0) return [];
+  const results = await Promise.all(ids.map(async (conversationId) => {
+    const { data, error } = await insforge.database
+      .from("messages")
+      .select("id,conversation_id,sender_id,body,attachment_type,created_at")
+      .eq("conversation_id", conversationId)
+      .order("created_at", { ascending: false })
+      .limit(1)
+      .maybeSingle();
+    if (error) throw error;
+    if (!data) return null;
+    return {
+      id: data.id,
+      conversationId: data.conversation_id,
+      senderId: data.sender_id,
+      body: data.body ?? "",
+      attachmentType: data.attachment_type ?? null,
+      createdAt: data.created_at,
+    } satisfies ConversationPreview;
+  }));
+  return results.filter((preview): preview is ConversationPreview => preview !== null);
 }
 
 export async function insforgeGetConversationForUser(conversationId: string, userId: string) {

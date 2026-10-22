@@ -1,6 +1,6 @@
 import "server-only";
 
-import { createClient } from "@supabase/supabase-js";
+import { createClient } from "@insforge/sdk";
 import { cookies } from "next/headers";
 import { getDatabase, saveDatabase } from "@/lib/db/store";
 
@@ -16,18 +16,16 @@ async function currentAccessToken(): Promise<string | null> {
   return store.get("insforge_access_token")?.value ?? null;
 }
 
-/** Legacy Supabase-shaped client; new InsForge database calls should use the SDK. */
-export const insforge = createClient(INSFORGE_URL, ANON_KEY, {
-  auth: { persistSession: false, autoRefreshToken: false, detectSessionInUrl: false },
-  global: {
-    fetch: async (input, init) => {
-      const headers = new Headers(input instanceof Request ? input.headers : undefined);
-      new Headers(init?.headers).forEach((value, key) => headers.set(key, value));
-      const accessToken = await currentAccessToken();
-      headers.set("apikey", ANON_KEY);
-      headers.set("Authorization", `Bearer ${accessToken ?? ANON_KEY}`);
-      return fetch(input, { ...init, headers });
-    },
+export const insforge = createClient({
+  baseUrl: INSFORGE_URL,
+  anonKey: ANON_KEY,
+  fetch: async (input, init) => {
+    const headers = new Headers(input instanceof Request ? input.headers : undefined);
+    new Headers(init?.headers).forEach((value, key) => headers.set(key, value));
+    const accessToken = await currentAccessToken();
+    headers.set("apikey", ANON_KEY);
+    headers.set("Authorization", `Bearer ${accessToken ?? ANON_KEY}`);
+    return fetch(input, { ...init, headers });
   },
 });
 
@@ -186,6 +184,19 @@ export async function insforgeDelete(table: string, id: string): Promise<void> {
     }
     const [field, expected] = id.includes(".eq.") ? id.split(".eq.") : ["id", id];
     await saveDatabase((db: any) => { db[key] = (db[key] ?? []).filter((row: any) => String(row[field] ?? "") !== expected); });
+  }
+}
+
+export async function insforgeDeleteWhere(table: string, params: Record<string, string>): Promise<void> {
+  try {
+    await insforgeRequest(table, "DELETE", params);
+  } catch (error) {
+    if (process.env.NODE_ENV !== "development" || table !== "saved_places") throw error;
+    const userId = params.user_id?.replace(/^eq\./, "");
+    const placeId = params.place_id?.replace(/^eq\./, "");
+    await saveDatabase((db: any) => {
+      db.saved = db.saved.filter((row: any) => row.userId !== userId || row.placeId !== placeId);
+    });
   }
 }
 

@@ -2,7 +2,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { createBrowserClient } from "@insforge/sdk/ssr";
+import { getInsForgeBrowserClient } from "@/lib/insforge-browser";
 import { COMMUNITY_POST_IMAGE_BUCKET, PROFILE_IMAGE_BUCKET } from "@/features/account/constants";
 
 type CommunityPostImageProps = {
@@ -32,7 +32,7 @@ export function CommunityPostImage({ src, storageKey, className = "" }: Communit
     const bucket = src.includes("/buckets/community-post-images/")
       ? COMMUNITY_POST_IMAGE_BUCKET
       : PROFILE_IMAGE_BUCKET;
-    const client = createBrowserClient();
+    const client = getInsForgeBrowserClient();
     const { data, error } = await client.storage
       .from(bucket)
       .createSignedUrl(storageKey, 3600);

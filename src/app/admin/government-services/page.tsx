@@ -1,10 +1,10 @@
 // @ts-nocheck
 import Link from "next/link";
-import { getDatabase } from "@/lib/db/store"; import { getDirectoryLocationOptions } from "@/services/locations"; import { Badge, Card } from "@/components/ui/badge"; import { PageHeader } from "@/components/layout/page-header"; import { ServiceForm } from "@/components/admin/service-form"; import { RecordActions } from "@/components/admin/record-actions"; import { serviceCategoryLabel } from "@/components/cards/service-card"; import { formatDate } from "@/lib/utils";
+import { insforgeSelectMany } from "@/lib/insforge"; import { mapDbRow } from "@/lib/db/insforge"; import { getDirectoryLocationOptions } from "@/services/locations"; import { Badge, Card } from "@/components/ui/badge"; import { PageHeader } from "@/components/layout/page-header"; import { ServiceForm } from "@/components/admin/service-form"; import { RecordActions } from "@/components/admin/record-actions"; import { serviceCategoryLabel } from "@/components/cards/service-card"; import { formatDate } from "@/lib/utils";
 export const metadata = { title: "Government Services" };
 export default async function AdminGovernmentServicesPage() {
-const [db, options] = await Promise.all([getDatabase(), getDirectoryLocationOptions()]);
-const services = [...db.governmentServices].sort((a, b) => b.updatedAt.localeCompare(a.updatedAt));
+const [{ data }, options] = await Promise.all([insforgeSelectMany("government_services", { order: "updated_at.desc", limit: "500" }), getDirectoryLocationOptions()]);
+const services = mapDbRow(data || []);
 return (
 <>
 <PageHeader title="Government Services" description="Manage government-service information." />

@@ -1,15 +1,14 @@
 // @ts-nocheck
 import Link from "next/link";
-import { FOOTER_LINKS, SITE } from "@/config/site"; import { Icon } from "@/components/ui/icons";
+import { FOOTER_LINKS, SITE } from "@/config/site";
+import MainLogo from "../../../public/logo/Main-Logo.webp";
 export function Footer() {
 return (
 <footer className="mt-16 border-t border-slate-200 bg-white">
 <div className="container-x grid gap-8 py-12 md:grid-cols-4">
 <div>
 <Link href="/" className="flex items-center gap-2 font-bold text-brand-700">
-<span className="grid h-9 w-9 place-items-center rounded-lg bg-brand-600 text-white">
-<Icon name="map-pin" className="h-5 w-5" />
-</span>
+<img src={MainLogo.src} alt="" className="h-9 w-9 object-contain" />
 {SITE.name}
 </Link>
 <p className="mt-3 text-sm text-slate-600">{SITE.description}</p>

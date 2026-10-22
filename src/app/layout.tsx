@@ -6,6 +6,7 @@ import { Footer } from "@/components/layout/footer";
 import { Header } from "@/components/layout/header";
 import { PageTheme } from "@/components/layout/page-theme";
 import { ToastProvider } from "@/components/ui/toast";
+import { AuthFeedback } from "@/components/ui/auth-feedback";
 import { LanguageProvider } from "@/components/i18n/language-provider";
 import "./globals.css";
 
@@ -25,7 +26,10 @@ export const metadata: Metadata = {
     locale: "en_US",
   },
   twitter: { card: "summary_large_image", site: SITE.twitter, title: SITE.name, description: SITE.description },
-  icons: { icon: "/icons/favicon.svg" },
+  icons: {
+    icon: "/icons/favicon.svg?v=4a9263cc",
+    shortcut: "/icons/favicon.svg?v=4a9263cc",
+  },
 };
 
 export const viewport: Viewport = {
@@ -40,13 +44,14 @@ export default async function RootLayout({ children }: { children: React.ReactNo
 
   return (
     <html lang={locale}>
-      <body className="flex min-h-screen flex-col">
+      <body suppressHydrationWarning className="flex min-h-screen flex-col">
         <LanguageProvider
           initialLocale={locale}
           enabled={false}
           translationConfigured={Boolean(process.env.LIBRETRANSLATE_URL)}
         >
           <ToastProvider>
+            <AuthFeedback />
             <a
               href="#main-content"
               className="sr-only focus:not-sr-only focus:absolute focus:left-4 focus:top-4 focus:z-50 focus:rounded-lg focus:bg-brand-600 focus:px-4 focus:py-2 focus:text-white"
