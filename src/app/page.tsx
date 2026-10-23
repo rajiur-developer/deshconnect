@@ -39,7 +39,7 @@ return (
 <div className="container-x relative flex min-h-[60vh] flex-col items-center justify-center py-12 sm:py-16">
 <div className="enter-fade mx-auto max-w-3xl text-center">
 <Badge tone="accent" className="bg-white/15 text-white ring-white/20">
-Bangladesh's information and community platform             </Badge>             <h2 className="mt-4 text-2xl font-bold text-white sm:text-4xl">               Find places, services, blood donors, hospitals, emergency help, and people across Bangladesh <br/> all in one place.
+Bangladesh's information and community platform             </Badge>             <h2 className="mt-4 text-2xl font-bold text-white sm:text-4xl">               Find Places, Services, Blood Donors, Hospitals, Emergency help, and people across Bangladesh <br/> All in one place.
 </h2>
 <p className="mt-4 text-sm text-brand-50">
 Search places, blood donation, blood request, educational institutions, hospitals, businesses and government services by division, district and upazila.
