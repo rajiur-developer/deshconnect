@@ -1,6 +1,7 @@
 // @ts-nocheck
 import "server-only";
 
+import { insforge } from "@/lib/insforge";
 import { insforgeGet, insforgeInsert, insforgeUpdate, insforgeDelete, insforgeSelectOne, insforgeSelectMany } from "@/lib/insforge";
 
 export async function insforgeListPublicDonors(query: {
@@ -11,17 +12,34 @@ export async function insforgeListPublicDonors(query: {
   bloodGroup?: string;
   sort?: "relevance" | "name" | "newest" | "rating";
 }) {
-  const params: Record<string, string> = { consent_listed: "eq.true", order: "created_at.desc" };
-  if (query.divisionId) params["division_id"] = `eq.${query.divisionId}`;
-  if (query.districtId) params["district_id"] = `eq.${query.districtId}`;
-  if (query.upazilaId) params["upazila_id"] = `eq.${query.upazilaId}`;
-  if (query.bloodGroup) params["blood_group"] = `eq.${query.bloodGroup}`;
-  const { data } = await insforgeSelectMany("public_blood_donors", params);
-  const rows = data || [];
+  const pageSize = 500;
+  let donorQuery = insforge.database
+    .from("public_blood_donors")
+    .select("id,user_id,blood_group,availability,preferred_contact,donation_count,consent_listed,division_id,district_id,upazila_id,created_at,updated_at,phone,whatsapp")
+    .eq("consent_listed", true)
+    .order("created_at", { ascending: false })
+    .order("id", { ascending: true });
+  if (query.divisionId) donorQuery = donorQuery.eq("division_id", query.divisionId);
+  if (query.districtId) donorQuery = donorQuery.eq("district_id", query.districtId);
+  if (query.upazilaId) donorQuery = donorQuery.eq("upazila_id", query.upazilaId);
+  if (query.bloodGroup) donorQuery = donorQuery.eq("blood_group", query.bloodGroup);
+  const rows = [];
+  for (let offset = 0; ; offset += pageSize) {
+    const { data, error } = await donorQuery.range(offset, offset + pageSize - 1);
+    if (error) throw new Error(`Could not load public blood donors: ${error.message}`);
+    rows.push(...(data ?? []));
+    if ((data ?? []).length < pageSize) break;
+  }
   const userIds = [...new Set(rows.map((row: any) => row.user_id).filter(Boolean))];
-  const { data: profiles } = userIds.length
-    ? await insforgeSelectMany("public_profiles", { id: `in.(${userIds.join(",")})` })
-    : { data: [] };
+  const profileResults = await Promise.all(
+    Array.from({ length: Math.ceil(userIds.length / 100) }, (_, index) =>
+      insforge.database.from("public_profiles").select("id,full_name").in("id", userIds.slice(index * 100, (index + 1) * 100)).limit(100),
+    ),
+  );
+  for (const result of profileResults) {
+    if (result.error) throw new Error(`Could not load donor profile names: ${result.error.message}`);
+  }
+  const profiles = profileResults.flatMap((result) => result.data ?? []);
   const names = new Map((profiles || []).map((profile: any) => [profile.id, profile.full_name]));
   const donors = rows.map((r: any) => ({
     id: r.id,
@@ -120,6 +138,7 @@ export async function insforgeGetDonorForUser(userId: string) {
     consentListed: data.consent_listed,
     consentContact: data.consent_contact,
     consentExpiry: data.consent_expiry,
+    archivedAt: data.archived_at ?? null,
     divisionId: data.division_id,
     districtId: data.district_id,
     upazilaId: data.upazila_id,
@@ -144,7 +163,12 @@ export async function insforgeUpsertDonor(input: {
   consentListed: boolean;
   consentContact: boolean;
 }) {
-  const existing = await insforgeSelectOne("blood_donors", { user_id: `eq.${input.userId}` });
+  const { data: existing, error: lookupError } = await insforge.database
+    .from("blood_donors")
+    .select("*")
+    .eq("user_id", input.userId)
+    .maybeSingle();
+  if (lookupError) throw lookupError;
   const record = {
     user_id: input.userId,
     blood_group: input.bloodGroup,
@@ -163,10 +187,22 @@ export async function insforgeUpsertDonor(input: {
     consent_expiry: new Date(Date.now() + 365 * 24 * 60 * 60 * 1000).toISOString(),
   };
   if (existing) {
-    await insforgeUpdate("blood_donors", existing.id, record);
-    return { ...existing, ...record };
+    const { data, error } = await insforge.database
+      .from("blood_donors")
+      .update(record)
+      .eq("id", existing.id)
+      .select("*")
+      .single();
+    if (error) throw error;
+    return data;
   }
-  return insforgeInsert("blood_donors", record);
+  const { data, error } = await insforge.database
+    .from("blood_donors")
+    .insert([record])
+    .select("*")
+    .single();
+  if (error) throw error;
+  return data;
 }
 
 export async function insforgeCreateBloodRequest(input: {

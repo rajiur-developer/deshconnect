@@ -228,12 +228,44 @@ return { ok: true }; }
 export async function adminDeleteBloodDonorAction(id: string): Promise<{ ok: boolean; error?: string }> {
 const user = await guard("blood:manage");
 if (!id || typeof id !== "string") return { ok: false, error: "Invalid donor record." };
-const donor = await deleteAdminRow("blood_donors", id);
+let donor;
+try {
+donor = await deleteAdminRow("blood_donors", id);
+} catch (error) {
+console.error("Could not permanently delete donor record:", error);
+return { ok: false, error: "Donor record could not be deleted. Please try again." };
+}
 if (!donor) return { ok: false, error: "Donor record not found." };
 await audit(user, "blood-donor:delete", "blood_donor", id);
 revalidatePath("/admin/blood-donors");
 revalidatePath("/blood-donation");
 return { ok: true }; }
+export async function adminSetBloodDonorVisibilityAction(
+id: string,
+visible: boolean,
+): Promise<{ ok: boolean; error?: string }> {
+const user = await guard("blood:manage");
+if (!id || typeof id !== "string") return { ok: false, error: "Invalid donor record." };
+let donor;
+try {
+donor = await updateAdminRow("blood_donors", id, {
+archived_at: visible ? null : new Date().toISOString(),
+...(visible ? {} : {
+consent_listed: false,
+consent_contact: false,
+availability: "unavailable",
+}),
+});
+} catch (error) {
+console.error("Could not update donor visibility:", error);
+return { ok: false, error: "Donor visibility could not be changed. Please try again." };
+}
+if (!donor) return { ok: false, error: "Donor record not found." };
+await audit(user, `blood-donor:${visible ? "restored" : "hidden"}`, "blood_donor", id);
+revalidatePath("/admin/blood-donors");
+revalidatePath("/blood-donation");
+return { ok: true };
+}
 export async function adminDeletePlaceAction(id: string) {
 const user = await guard("places:delete");
 const deleted = await deleteAdminRow("places", id);

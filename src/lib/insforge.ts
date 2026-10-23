@@ -75,7 +75,7 @@ async function localRows(table: string, params: Record<string, string>): Promise
   });
   if (table === "public_blood_donors") {
     const now = Date.now();
-    rows = rows.filter((row: any) => row.consent_listed === true && row.consent_contact === true && (!row.consent_expiry || new Date(row.consent_expiry).getTime() >= now));
+    rows = rows.filter((row: any) => row.consent_listed === true && row.consent_contact === true && !row.archived_at && (!row.consent_expiry || new Date(row.consent_expiry).getTime() >= now));
   }
   if (params.or) {
     const alternatives = [...params.or.matchAll(/([a-z_]+)\.(eq|ilike)\.([^,)]+)/g)];

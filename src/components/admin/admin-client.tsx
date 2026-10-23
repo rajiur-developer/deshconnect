@@ -5,11 +5,13 @@ import {
 adminDeletePlaceAction,
 adminDeleteNewsAction,
 adminDeleteUserAction,
+adminDeleteBloodDonorAction,
 adminModeratePostAction,
 adminResolveReportAction,
 adminSavePermissionsAction,
 adminSaveSettingsAction,
 adminSetBloodRequestStatusAction,
+adminSetBloodDonorVisibilityAction,
 adminSetNewsStatusAction,
 adminUpdateNewsAction,
 adminSetReviewStatusAction,
@@ -168,6 +170,57 @@ aria-label="Request status"
 <option value="expired">Expired</option>
 </select>
 ); }
+export function BloodDonorActions({
+id,
+archived,
+}: {
+id: string;
+archived: boolean;
+}) {
+const [pending, startTransition] = useTransition();
+const [message, setMessage] = useState("");
+const router = useRouter();
+function setVisibility(visible: boolean) {
+const prompt = visible
+? "Restore this donor record? It will remain hidden until the donor consents again."
+: "Hide this donor from Find a donor? The record will remain in the admin list.";
+if (!window.confirm(prompt)) return;
+startTransition(async () => {
+try {
+const result = await adminSetBloodDonorVisibilityAction(id, visible);
+setMessage(result.error ?? (visible ? "Donor record restored. Public listing still requires donor consent." : "Donor hidden from public listings."));
+if (result.ok) router.refresh();
+} catch {
+setMessage("Donor visibility could not be changed. Please try again.");
+}
+});
+}
+function permanentlyDelete() {
+if (!window.confirm("Permanently delete this donor record? This cannot be undone.")) return;
+startTransition(async () => {
+try {
+const result = await adminDeleteBloodDonorAction(id);
+setMessage(result.error ?? "Donor record permanently deleted.");
+if (result.ok) router.refresh();
+} catch {
+setMessage("Donor record could not be deleted. Please try again.");
+}
+});
+}
+return (
+<div className="min-w-40 space-y-2">
+<div className="flex flex-wrap gap-1">
+<button type="button" disabled={pending} onClick={() => setVisibility(archived)} className="rounded-lg border border-slate-300 px-2 py-1 text-xs text-slate-700 hover:bg-slate-50 disabled:opacity-50">
+{archived ? "Restore record" : "Hide"}
+</button>
+<button type="button" disabled={pending} onClick={permanentlyDelete} className="rounded-lg border border-red-200 px-2 py-1 text-xs text-red-700 hover:bg-red-50 disabled:opacity-50">
+Delete
+</button>
+</div>
+{message && <p role="status" className="text-xs text-slate-600">{message}</p>}
+</div>
+);
+}
 export function DeletePlaceButton({ id }: { id: string }) {
 const [pending, startTransition] = useTransition();
 const router = useRouter();

@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { Icon } from "@/components/ui/icons";
-import { formatDayFirstDate, parseDayFirstDate } from "@/lib/date-input";
+import { formatDayFirstDate, getDayFirstDateError, parseDayFirstDate } from "@/lib/date-input";
 
 type DateInputProps = {
   id: string;
@@ -63,28 +63,18 @@ export function DateInput({
         inputMode="numeric"
         autoComplete="off"
         placeholder="DD/MM/YYYY"
-        pattern="\\d{1,2}/\\d{1,2}/\\d{4}"
+        pattern="\d{1,2}/\d{1,2}/\d{4}"
         value={displayValue}
         required={required}
         aria-describedby={`${id}-format`}
         onChange={(event) => {
           const nextValue = event.target.value;
-          const parsed = parseDayFirstDate(nextValue);
-          const invalid = Boolean(
-            nextValue &&
-              (!parsed || (min && parsed < min) || (max && parsed > max)),
-          );
-          event.currentTarget.setCustomValidity(
-            invalid ? "Enter a valid date in DD/MM/YYYY format." : "",
-          );
+          event.currentTarget.setCustomValidity(getDayFirstDateError(nextValue, min, max) ?? "");
           updateDisplay(nextValue);
         }}
         onBlur={(event) => {
-          const parsed = parseDayFirstDate(event.currentTarget.value);
           event.currentTarget.setCustomValidity(
-            event.currentTarget.value && (!parsed || (min && parsed < min) || (max && parsed > max))
-              ? "Enter a valid date in DD/MM/YYYY format."
-              : "",
+            getDayFirstDateError(event.currentTarget.value, min, max) ?? "",
           );
         }}
         className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 pr-11 text-sm text-slate-900 placeholder:text-slate-400 focus-ring"

@@ -5,7 +5,7 @@ import { listAdminUsers } from "@/services/users";
 import { getCurrentUser } from "@/lib/auth/current-user";
 import { can } from "@/lib/auth/permissions";
 import { getRolePermissionOverrides } from "@/services/role-permissions";
-import { Badge, Card } from "@/components/ui/badge"; import { PageHeader } from "@/components/layout/page-header"; import { maskPhone } from "@/lib/utils";
+import { Badge, Card } from "@/components/ui/badge"; import { PageHeader } from "@/components/layout/page-header"; import { BloodDonorActions } from "@/components/admin/admin-client";
 
 export const metadata = { title: "Blood Donors" };
 
@@ -22,7 +22,7 @@ export default async function AdminBloodDonorsPage() {
     <>
       <PageHeader
         title="Blood Donors"
-        description="Manage donor records within authorised limits. Contact values are masked in this view."
+        description="Manage donor records within authorised limits. Full contact numbers are visible to authorised blood-donation staff."
       />
       <Card className="overflow-x-auto p-0">
         <table className="min-w-full divide-y divide-slate-100 text-sm">
@@ -31,8 +31,11 @@ export default async function AdminBloodDonorsPage() {
               <th className="px-4 py-3">Donor</th>
               <th className="px-4 py-3">Group</th>
               <th className="px-4 py-3">Availability</th>
+              <th className="px-4 py-3">Profile status</th>
               <th className="px-4 py-3">Consent</th>
-              <th className="px-4 py-3">Contact (masked)</th>
+              <th className="px-4 py-3">Phone</th>
+              <th className="px-4 py-3">WhatsApp</th>
+              <th className="px-4 py-3">Actions</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-100">
@@ -47,12 +50,19 @@ export default async function AdminBloodDonorsPage() {
                   <td className="px-4 py-3"><Badge tone="brand">{donor.bloodGroup}</Badge></td>
                   <td className="px-4 py-3 capitalize text-slate-600">{donor.availability}</td>
                   <td className="px-4 py-3">
+                    <Badge tone={donor.archivedAt || !donor.consentListed || !donor.consentContact ? "amber" : "success"}>
+                      {donor.archivedAt ? "Archived" : !donor.consentListed || !donor.consentContact ? "Hidden" : "Active"}
+                    </Badge>
+                  </td>
+                  <td className="px-4 py-3">
                     <div className="flex gap-1">
                       <Badge tone={donor.consentListed ? "success" : "neutral"}>listed</Badge>
                       <Badge tone={donor.consentContact ? "success" : "neutral"}>contact</Badge>
                     </div>
                   </td>
-                  <td className="px-4 py-3 text-slate-600">{maskPhone(donor.contactValue)}</td>
+                  <td className="px-4 py-3 text-slate-600">{donor.phone || donor.contactValue || "—"}</td>
+                  <td className="px-4 py-3 text-slate-600">{donor.whatsapp || "—"}</td>
+                  <td className="px-4 py-3"><BloodDonorActions id={donor.id} archived={Boolean(donor.archivedAt)} /></td>
                 </tr>
               );
             })}

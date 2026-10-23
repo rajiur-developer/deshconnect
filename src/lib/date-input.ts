@@ -23,3 +23,16 @@ export function parseDayFirstDate(value: string): string | null {
 
   return `${String(year).padStart(4, "0")}-${String(month).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
 }
+
+export function getDayFirstDateError(
+  value: string,
+  min?: string,
+  max?: string,
+): string | null {
+  if (!value) return null;
+  const parsed = parseDayFirstDate(value);
+  if (!parsed) return "Enter a valid date in DD/MM/YYYY format.";
+  if (min && parsed < min) return "Date cannot be in the past. Choose today or a future date.";
+  if (max && parsed > max) return "Date cannot be in the future.";
+  return null;
+}

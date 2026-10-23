@@ -2,16 +2,15 @@
 "use server";
 import { revalidatePath } from "next/cache";
 import { getDonationEligibility } from "@/lib/blood-donation";
-import { requireUser } from "@/lib/auth/current-user"; import { insforge } from "@/lib/insforge"; import { mapDbRow } from "@/lib/db/insforge"; import { formatZodError, bloodRequestSchema, donorSchema, messageSchema } from "@/lib/validation/schemas"; import { sanitizeMultiline, sanitizeText } from "@/lib/security/sanitize"; import { rateLimit } from "@/lib/security/rate-limit"; import { RATES } from "@/lib/constants"; import { notify } from "@/services/notifications"; import { createBloodRequest, upsertDonor } from "@/services/blood";
+import { requireUser } from "@/lib/auth/current-user"; import { insforge } from "@/lib/insforge"; import { formatZodError, bloodRequestSchema, donorSchema, messageSchema } from "@/lib/validation/schemas"; import { sanitizeMultiline, sanitizeText } from "@/lib/security/sanitize"; import { rateLimit } from "@/lib/security/rate-limit"; import { RATES } from "@/lib/constants"; import { notify } from "@/services/notifications"; import { createBloodRequest, upsertDonor } from "@/services/blood";
 export type BloodFormState = { error?: string; success?: string };
-const ONE_YEAR_MS = 365 * 24 * 60 * 60 * 1000;
 export async function registerDonorAction(_prev: BloodFormState, formData: FormData): Promise<BloodFormState> {
 const user = await requireUser();
 const parsed = donorSchema.safeParse({
 bloodGroup: formData.get("bloodGroup"),
 availability: formData.get("availability"),
 preferredContact: formData.get("preferredContact"),
-contactValue: formData.get("contactValue") || undefined,
+contactValue: formData.get("contactValue") || formData.get("phone") || formData.get("whatsapp") || undefined,
 phone: formData.get("phone") || undefined,
 whatsapp: formData.get("whatsapp") || undefined,
 lastDonationAt: formData.get("lastDonationAt") || undefined,
@@ -32,6 +31,7 @@ if (!parsed.data.consentContact) return { error: "Consent to showing your phone 
 if (parsed.data.availability === "available" && !getDonationEligibility(parsed.data.lastDonationAt)?.eligible) {
 return { error: "You can mark yourself Ready only 75 days after your last donation." };
 }
+try {
 await upsertDonor({
 userId: user.id,
 bloodGroup: parsed.data.bloodGroup,
@@ -48,8 +48,38 @@ divisionId: parsed.data.divisionId,
 districtId: parsed.data.districtId,
 upazilaId: parsed.data.upazilaId,
 });
+} catch (error) {
+console.error("Could not save donor profile:", error);
+return { error: "Your donor profile could not be saved. Please try again." };
+}
 revalidatePath("/blood-donation");
+revalidatePath("/settings");
 return { success: "Your donor profile has been saved." }; }
+export async function archiveOwnDonorProfileAction(): Promise<{ ok: boolean; error?: string }> {
+const user = await requireUser();
+const { data, error } = await insforge.database
+.from("blood_donors")
+.update({
+availability: "unavailable",
+consent_listed: false,
+consent_contact: false,
+archived_at: new Date().toISOString(),
+updated_at: new Date().toISOString(),
+})
+.eq("user_id", user.id)
+.is("archived_at", null)
+.select("id")
+.maybeSingle();
+if (error) {
+console.error("Could not archive donor profile:", error);
+return { ok: false, error: "Your donor profile could not be removed. Please try again." };
+}
+if (!data) return { ok: false, error: "No active donor profile was found." };
+revalidatePath("/blood-donation");
+revalidatePath("/settings");
+revalidatePath("/admin/blood-donors");
+return { ok: true };
+}
 export async function createBloodRequestAction(_prev: BloodFormState, formData: FormData): Promise<BloodFormState> {
 const user = await requireUser();
 const parsed = bloodRequestSchema.safeParse({
@@ -72,6 +102,7 @@ const limit = rateLimit(`bloodrequest:${user.id}`, RATES.bloodRequestPerHour, 60
 if (!limit.ok) {
 return { error: `Too many requests. Try again in ${limit.retryAfterSeconds}s.` };
 }
+try {
 await createBloodRequest({
 requesterId: user.id,
 bloodGroup: parsed.data.bloodGroup,
@@ -84,11 +115,19 @@ neededBy: parsed.data.neededBy,
 notes: parsed.data.notes ? sanitizeText(parsed.data.notes, 1000) : undefined,
 location: { divisionId: parsed.data.divisionId, districtId: parsed.data.districtId, upazilaId: parsed.data.upazilaId },
 });
+} catch (error) {
+console.error("Could not submit blood request:", error);
+return { error: "Your blood request could not be submitted. Please try again." };
+}
+try {
 await notify(user.id, {
 title: "Blood request submitted",
 body: "Your request is under review and will be published once approved.",
 href: "/my-blood-requests",
 });
+} catch (error) {
+console.error("Blood request was submitted, but its confirmation notification failed:", error);
+}
 revalidatePath("/blood-donation");
 return { success: "Your blood request has been submitted for review." }; }
 export async function cancelBloodRequestAction(requestId: string): Promise<{ cancelled: boolean }> {
@@ -163,32 +202,39 @@ export async function startBloodChatAction(
 targetType: "donor" | "request",
 targetId: string ): Promise<{ conversationId?: string; error?: string }> {
 const user = await requireUser();
-if (targetType !== "donor" && targetType !== "request") {
+if ((targetType !== "donor" && targetType !== "request") || !targetId) {
 return { error: "Invalid blood listing." };
 }
 let targetUserId: string | null = null;
 if (targetType === "donor") {
-const { data: donor } = await insforge.database
-.from("blood_donors")
+const { data: donor, error } = await insforge.database
+.from("public_blood_donors")
 .select("user_id")
 .eq("id", targetId)
-.eq("consent_listed", true)
-.single();
+.maybeSingle();
+if (error) {
+console.error("Could not load donor for blood chat:", error);
+return { error: "Could not open this donor chat. Please try again." };
+}
 targetUserId = donor?.user_id ?? null;
 } else {
-const { data: request } = await insforge.database
+const { data: request, error } = await insforge.database
 .from("blood_requests")
 .select("requester_id")
 .eq("id", targetId)
 .eq("status", "active")
-.single();
+ .maybeSingle();
+if (error) {
+console.error("Could not load request for blood chat:", error);
+return { error: "Could not open this request chat. Please try again." };
+}
 targetUserId = request?.requester_id ?? null;
 }
 if (!targetUserId || targetUserId === user.id) {
 return { error: "This blood listing is no longer available for chat." };
 }
 // Check if conversation already exists
-const { data: existingConv } = await insforge.database
+const { data: existingConv, error: existingError } = await insforge.database
 .from("conversations")
 .select("id")
 .eq("conversation_type", "blood")
@@ -197,36 +243,54 @@ const { data: existingConv } = await insforge.database
 .filter("participant_ids", "cs", `{${user.id}}`)
 .filter("participant_ids", "cs", `{${targetUserId}}`)
 .maybeSingle();
+if (existingError) {
+console.error("Could not find existing blood chat:", existingError);
+return { error: "Could not open this chat. Please try again." };
+}
 if (existingConv) {
 return { conversationId: existingConv.id };
 }
 const { data: conv, error } = await insforge.database
 .from("conversations")
 .insert([{ participant_ids: [user.id, targetUserId], conversation_type: "blood", blood_target_type: targetType, blood_target_id: targetId }])
-.select()
+.select("id")
 .single();
-if (error) throw error;
+if (error || !conv) {
+console.error("Could not create blood chat:", error);
+return { error: "Could not create this chat. Please try again." };
+}
 return { conversationId: conv.id }; }
 export async function getBloodChatMessagesAction(conversationId: string) {
 const user = await requireUser();
-const conversation = await insforge.database
+const { data: conversation, error: conversationError } = await insforge.database
 .from("conversations")
 .select("*")
 .eq("id", conversationId)
 .eq("conversation_type", "blood")
 .filter("participant_ids", "cs", `{${user.id}}`)
-.single();
+.maybeSingle();
+if (conversationError) {
+console.error("Could not verify blood chat participant:", conversationError);
+return { error: "Could not load this chat. Please try again." };
+}
 if (!conversation) return { error: "You are not a participant in this conversation." };
 const { data: messages, error } = await insforge.database
 .from("messages")
 .select("*")
 .eq("conversation_id", conversationId)
 .order("created_at", { ascending: true });
-if (error) throw error;
+if (error) {
+console.error("Could not load blood chat messages:", error);
+return { error: "Could not load messages. Please try again." };
+}
 return { messages: (messages ?? []).map((message: any) => ({ id: message.id, conversationId: message.conversation_id, senderId: message.sender_id, body: message.body, createdAt: message.created_at })) }; }
 export async function sendBloodChatMessageAction(conversationId: string, body: string) {
 const user = await requireUser();
-const { data: conversation } = await insforge.database.from("conversations").select("id").eq("id", conversationId).eq("conversation_type", "blood").filter("participant_ids", "cs", `{${user.id}}`).maybeSingle();
+const { data: conversation, error: conversationError } = await insforge.database.from("conversations").select("id").eq("id", conversationId).eq("conversation_type", "blood").filter("participant_ids", "cs", `{${user.id}}`).maybeSingle();
+if (conversationError) {
+console.error("Could not verify blood chat participant before sending:", conversationError);
+return { error: "Could not send your message. Please try again." };
+}
 if (!conversation) return { error: "You are not a participant in this blood donation chat." };
 const parsed = messageSchema.safeParse({ body });
 if (!parsed.success) return { error: formatZodError(parsed.error) };
@@ -241,5 +305,8 @@ body: sanitizeMultiline(parsed.data.body, 2000),
 }])
 .select()
 .single();
-if (!message) return { error: "You are not a participant in this conversation." };
+if (error || !message) {
+console.error("Could not send blood chat message:", error);
+return { error: "Could not send your message. Please try again." };
+}
 return { message: { id: message.id, conversationId: message.conversation_id, senderId: message.sender_id, body: message.body, createdAt: message.created_at } }; }

@@ -95,6 +95,7 @@ icon={<Icon name="droplet" className="h-10 w-10" />}
 key={donor.id}
 donor={donor}
 locationLabel={donorLabels[index] ?? undefined}
+isOwner={donor.userId === user?.id}
 action={<DonorContactButtons donorId={donor.id} phone={donor.phone} whatsapp={donor.whatsapp} viewerId={user?.id} />}
 />
 ))}

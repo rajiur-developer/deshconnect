@@ -1,5 +1,6 @@
 // @ts-nocheck
 "use client";
+import Link from "next/link";
 import { Icon } from "@/components/ui/icons";
 import { BloodChatLauncher } from "./blood-chat-popup";
 
@@ -45,6 +46,14 @@ function ContactActions({
         </a>
       )}
       {viewerId && <BloodChatLauncher {...chat} viewerId={viewerId} />}
+      {!viewerId && (
+        <Link
+          href="/login?next=%2Fblood-donation"
+          className="inline-flex items-center gap-1.5 rounded-lg border border-brand-200 bg-white px-3 py-1.5 text-xs font-medium text-brand-800 hover:bg-brand-50"
+        >
+          <Icon name="message" className="h-3.5 w-3.5" /> Log in to chat
+        </Link>
+      )}
       {!callNumber && !whatsappNumber && <span className="text-xs text-slate-500">Contact number not provided.</span>}
     </div>
   );

@@ -17,18 +17,27 @@ email: "Email",
 export function DonorCard({
 donor,
 locationLabel,
+isOwner,
 action, }: {
 donor: PublicDonor;
 locationLabel?: string;
+isOwner?: boolean;
 action?: React.ReactNode; }) {
 return (
 <Card className="flex h-full flex-col p-4">
-<div className="flex items-start gap-3">
+<div className="flex items-start justify-between gap-3">
+<div className="flex min-w-0 items-start gap-3">
 <BloodGroupBadge group={donor.bloodGroup} />
 <div className="min-w-0">
 <p className="text-sm font-semibold text-slate-900">{donor.fullName}</p>
 <p className="text-xs text-slate-500">{donor.donationCount} donations</p>
 </div>
+</div>
+{isOwner && (
+<a href="#donor-form" className="shrink-0 rounded-lg border border-brand-200 px-3 py-2 text-xs font-medium text-brand-800 hover:bg-brand-50">
+Update info
+</a>
+)}
 </div>
 <div className="mt-3 flex flex-wrap items-center gap-2">
 <Badge tone={AVAILABILITY_TONE[donor.availability]}>
@@ -42,9 +51,6 @@ return (
 {locationLabel}
 </p>
 )}
-<p className="mt-3 text-xs text-slate-400">
-Phone and WhatsApp are public because this donor opted in to sharing them.
-</p>
 {action && <div className="mt-auto pt-4">{action}</div>}
 </Card>
 ); }

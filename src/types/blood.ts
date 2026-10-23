@@ -27,6 +27,7 @@ notes?: string | null;
 consentListed: boolean;
 consentContact: boolean;
 consentExpiry: string;
+archivedAt?: string | null;
 createdAt: string;
 updatedAt: string; }
 export interface BloodRequest extends LocationRef {

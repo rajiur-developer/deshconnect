@@ -8,6 +8,7 @@ type BloodFormState, } from "@/features/blood/actions"; import { BLOOD_GROUPS } 
 import { getDonationEligibility, isValidBloodDonationDate } from "@/lib/blood-donation";
 import { DateInput } from "@/components/ui/date-input";
 import type { DonorAvailability, ContactMethod } from "@/types/blood";
+import { DeleteDonorProfileButton } from "./donor-actions";
 type LocationProps = {
 divisions: LocationOption[];
 districts: DistrictOption[];
@@ -26,6 +27,7 @@ type DonorProfile = {
   upazilaId?: string | null;
   consentListed?: boolean;
   consentContact?: boolean;
+  archivedAt?: string | null;
 };
 const selectClass = "w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm focus-ring";
 function todayDate() {
@@ -59,6 +61,9 @@ if (lastDonationAt && !canDonate && availability === "available") setAvailabilit
 }, [lastDonationAt, canDonate, availability]);
 return (
 <form action={formAction} className="space-y-4">
+{profile?.archivedAt && <p role="status" className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-900">
+Your donor profile is archived and hidden from public listings. Your record remains available to admins. Save this form to restore your listing.
+</p>}
 <div className="grid gap-3 sm:grid-cols-2">
 <Field label="Blood group" htmlFor="bloodGroup" required>
 <select id="bloodGroup" name="bloodGroup" defaultValue={profile?.bloodGroup ?? ""} required className={selectClass}>
@@ -119,7 +124,8 @@ if (!isValidBloodDonationDate(value)) setAvailability((current) => current === "
 </div>
 {state.error && <p role="alert" className="text-sm text-accent-600">{state.error}</p>}
 {state.success && <p role="status" className="text-sm text-emerald-600">{state.success}</p>}
-<Button type="submit" disabled={pending}>{pending ? "Saving…" : "Register as donor"}</Button>
+<Button type="submit" disabled={pending}>{pending ? "Saving…" : profile?.archivedAt ? "Restore donor profile" : profile ? "Save changes" : "Register as donor"}</Button>
+{profile && !profile.archivedAt && <DeleteDonorProfileButton />}
 </form>
 ); }
 export function BloodRequestForm({ divisions, districts, upazilas }: LocationProps) {

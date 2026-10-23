@@ -77,6 +77,7 @@ const refreshMessages = useCallback(async () => {
 const result = await getBloodChatMessagesAction(conversationId);
 if (result.error) {
 setError(result.error);
+setLoading(false);
 return;
 }
 setMessages((current) => {

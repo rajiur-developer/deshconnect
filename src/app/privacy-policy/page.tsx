@@ -26,7 +26,7 @@ details.
 <ul>
 <li>Passwords—stored only as a secure hash.</li>
 <li>
-Donor phone numbers and contact details—shared only with approved requesters when you consent.
+Donor phone numbers and contact details—shown on the public donor listing only when you consent.
 </li>
 <li>Date of birth and personal address.</li>
 <li>Private messages, friendship requests, and reports.</li>
@@ -35,7 +35,8 @@ Donor phone numbers and contact details—shared only with approved requesters w
 <p>
 Registering as a donor is entirely voluntary. The decision to be listed and to share contact details
 belongs to the donor. Donors can update availability or remove themselves from the directory at any time.
-If not renewed, consent expires after one year.
+Removing a donor profile hides it from public listings and disables contact sharing; the record is retained
+in the admin system. If not renewed, consent expires after one year.
 </p>
 <h2>Security</h2>
 <p>
