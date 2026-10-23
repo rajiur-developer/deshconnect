@@ -26,6 +26,7 @@ export function MessageRealtimeNotifications({
     let active = true;
     let inFlight = false;
     let sessionUnavailable = false;
+    let consecutiveFailures = 0;
     let cursor = pollSince;
     const seen = new Set<string>();
     const lastUnreadCounts = new Map(initialUnreadMessages.map(({ conversationId, count }) => [conversationId, count]));
@@ -62,6 +63,7 @@ export function MessageRealtimeNotifications({
       try {
         const snapshot = await getMessageNotificationSnapshotAction(cursor);
         if (!active) return;
+        consecutiveFailures = 0;
         if (!snapshot.authenticated) {
           sessionUnavailable = true;
           window.clearInterval(timer);
@@ -89,7 +91,15 @@ export function MessageRealtimeNotifications({
         lastUnreadCounts.clear();
         counts.forEach((count, conversationId) => lastUnreadCounts.set(conversationId, count));
       } catch (error) {
-        if (active) console.warn("Could not refresh message notifications:", error);
+        consecutiveFailures += 1;
+        if (active && consecutiveFailures < 4) {
+          console.warn("Could not refresh message notifications:", error);
+        }
+        if (consecutiveFailures >= 4) {
+          sessionUnavailable = true;
+          window.clearInterval(timer);
+          document.removeEventListener("visibilitychange", refresh);
+        }
       } finally {
         inFlight = false;
       }

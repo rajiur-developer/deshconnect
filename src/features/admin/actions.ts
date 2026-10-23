@@ -201,7 +201,7 @@ upazilaId: formData.get("upazilaId") || undefined,
 if (!parsed.success) return { error: formatZodError(parsed.error) };
 const now = new Date().toISOString();
 const place = {
-slug: slugify(parsed.data.name),
+slug: `${slugify(parsed.data.name) || "place"}-${createId("place").slice(-8)}`,
 name: sanitizeText(parsed.data.name, 200),
 category: parsed.data.category,
 summary: sanitizeText(parsed.data.summary, 300),
@@ -225,9 +225,25 @@ districtId: parsed.data.districtId ?? null,
 upazilaId: parsed.data.upazilaId ?? null,
 };
 const client = createServerClient({ cookies: await cookies() });
-const { data: created, error } = await client.database.from("places").insert([{ slug: place.slug, name: place.name, category: place.category, summary: place.summary, description: place.description, address: place.address, latitude: place.latitude, longitude: place.longitude, image: place.image, gallery: place.gallery, rating: place.rating, review_count: place.reviewCount, opening_hours: place.openingHours, entry_fee: place.entryFee, best_time: place.bestTime, status: place.status, verification: place.verification, division_id: place.divisionId, district_id: place.districtId, upazila_id: place.upazilaId }]).select("id").single();
-if (error) return { error: "Place could not be saved. Please try again." };
+let created;
+try {
+const result = await client.database.from("places").insert([{ slug: place.slug, name: place.name, category: place.category, summary: place.summary, description: place.description, address: place.address, latitude: place.latitude, longitude: place.longitude, image: place.image, gallery: place.gallery, rating: place.rating, review_count: place.reviewCount, opening_hours: place.openingHours, entry_fee: place.entryFee, best_time: place.bestTime, status: place.status, verification: place.verification, division_id: place.divisionId, district_id: place.districtId, upazila_id: place.upazilaId }]).select("id").single();
+if (result.error) {
+console.error("Place creation failed", { code: result.error.code, message: result.error.message });
+if (result.error.code === "23505") return { error: "This place conflicts with an existing record. Please try again." };
+return { error: `Place could not be saved: ${result.error.message}` };
+}
+created = result.data;
+} catch (error) {
+console.error("Place creation request failed", error);
+return { error: error instanceof Error ? `Place could not be saved: ${error.message}` : "Place could not be saved. Please try again." };
+}
+if (!created?.id) return { error: "Place could not be saved because the database returned no record." };
+try {
 await audit(user, "place:create", "place", created.id);
+} catch (error) {
+console.error("Place was created but audit logging failed", error);
+}
 revalidatePath("/admin/places");
 revalidatePath("/places");
 return { success: "Place created and published." }; }

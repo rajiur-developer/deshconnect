@@ -1,6 +1,6 @@
 // @ts-nocheck
 "use client";
-import { useActionState } from "react";
+import { useActionState, useEffect, useRef, useState } from "react";
 import {
 adminUpdatePlaceAction,
 createPlaceAction,
@@ -26,9 +26,17 @@ const [state, formAction, pending] = useActionState<AdminFormState, FormData>(
 action as unknown as (prev: AdminFormState, fd: FormData) => Promise<AdminFormState>,
 {}
 );
+const formRef = useRef<HTMLFormElement>(null);
+const [resetKey, setResetKey] = useState(0);
 useFormStateToast(state);
+useEffect(() => {
+if (!record && state.success) {
+formRef.current?.reset();
+setResetKey((key) => key + 1);
+}
+}, [record, state]);
 return (
-<form action={formAction} className="space-y-4 rounded-2xl border border-slate-200 bg-white p-5">
+<form ref={formRef} action={formAction} className="space-y-4 rounded-2xl border border-slate-200 bg-white p-5">
 <h2 className="font-semibold text-slate-900">{record ? "Update place" : "Add a new place"}</h2>
 {!record && <p className="text-sm text-slate-600">Places created here are published immediately and marked as verified.</p>}
 {record && <input type="hidden" name="id" value={record.id} />}
@@ -55,6 +63,7 @@ return (
 <Input id="place-address" name="address" required defaultValue={record?.address ?? ""} placeholder="Upazila, District" />
 </Field>
 <LocationFields
+key={`location-${resetKey}`}
 divisions={divisions}
 districts={districts}
 upazilas={upazilas}
@@ -64,7 +73,7 @@ districtId: record?.districtId ?? undefined,
 upazilaId: record?.upazilaId ?? undefined,
 }}
 />
-<ImageUpload name="image" label="Place image" hint="Upload an image from your device, or leave as is" current={record?.image} />
+<ImageUpload key={`image-${resetKey}`} name="image" label="Place image" hint="Upload an image from your device, or leave as is" current={record?.image} />
 <div className="grid gap-4 sm:grid-cols-3">
 <Field label="Opening hours" htmlFor="place-hours" hint="Optional">
 <Input id="place-hours" name="openingHours" defaultValue={record?.openingHours ?? ""} placeholder="All day" />
