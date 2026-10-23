@@ -6,11 +6,13 @@ export function isValidAdminPlaceImageUrl(imageUrl: string, userId: string): boo
     const baseUrl = process.env.NEXT_PUBLIC_INSFORGE_URL;
     if (!baseUrl || url.origin !== new URL(baseUrl).origin) return false;
 
-    const prefix = `/api/storage/buckets/${COMMUNITY_POST_IMAGE_BUCKET}/objects/${userId}/places/`;
+    const prefix = `/api/storage/buckets/${COMMUNITY_POST_IMAGE_BUCKET}/objects/`;
     if (!url.pathname.startsWith(prefix)) return false;
 
     const key = decodeURIComponent(url.pathname.slice(prefix.length));
-    return key.length > 0 && !key.includes("/");
+    return key.startsWith(`${userId}/places/`)
+      && key.slice(`${userId}/places/`.length).length > 0
+      && !key.slice(`${userId}/places/`.length).includes("/");
   } catch {
     return false;
   }

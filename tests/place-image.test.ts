@@ -10,6 +10,10 @@ describe("admin place image URLs", () => {
     process.env.NEXT_PUBLIC_INSFORGE_URL = "https://backend.example";
 
     expect(isValidAdminPlaceImageUrl(
+      "https://backend.example/api/storage/buckets/community-post-images/objects/admin-1%2Fplaces%2Fimage.jpg",
+      "admin-1",
+    )).toBe(true);
+    expect(isValidAdminPlaceImageUrl(
       "https://backend.example/api/storage/buckets/community-post-images/objects/admin-1/places/image.jpg",
       "admin-1",
     )).toBe(true);
