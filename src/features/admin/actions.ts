@@ -6,6 +6,7 @@ import { cookies } from "next/headers";
 import { createServerClient } from "@insforge/sdk/ssr";
 import { getRolePermissionOverrides, saveRolePermissionOverrides } from "@/services/role-permissions";
 import { isContentCategory, type ContentCategorySection } from "@/services/content-categories";
+import { isValidAdminPlaceImageUrl } from "@/features/admin/place-image";
 export type AdminFormState = { error?: string; success?: string };
 async function guard(action: PermissionAction, redirectTo = "/admin") {
 const user = await requireUser(redirectTo);
@@ -291,6 +292,9 @@ upazilaId: formData.get("upazilaId") || undefined,
 });
 if (!parsed.success) return { error: formatZodError(parsed.error) };
 if (!(await isContentCategory("place", parsed.data.category))) return { error: "Please choose a valid place category." };
+if (parsed.data.image && !isValidAdminPlaceImageUrl(parsed.data.image, user.id)) {
+return { error: "The selected place image could not be verified. Please upload it again." };
+}
 const now = new Date().toISOString();
 const place = {
 slug: `${slugify(parsed.data.name) || "place"}-${createId("place").slice(-8)}`,
@@ -564,6 +568,7 @@ revalidatePath("/government-services"); }
 /** Update an existing tourist place. Admin and moderators. */ export async function adminUpdatePlaceAction(_prev: AdminFormState, formData: FormData): Promise<AdminFormState> {
 const user = await guard("places:edit");
 const id = String(formData.get("id") ?? "");
+const imageChanged = formData.get("imageChanged") === "true";
 const parsed = placeSchema.safeParse({
 name: formData.get("name"),
 category: formData.get("category"),
@@ -580,7 +585,10 @@ upazilaId: formData.get("upazilaId") || undefined,
 });
 if (!parsed.success) return { error: formatZodError(parsed.error) };
 if (!(await isContentCategory("place", parsed.data.category))) return { error: "Please choose a valid place category." };
-const updated = await updateAdminRow("places", id, { name: sanitizeText(parsed.data.name, 200), slug: slugify(parsed.data.name), category: parsed.data.category, summary: sanitizeText(parsed.data.summary, 10_000), description: sanitizeMultiline(parsed.data.description), address: sanitizeText(parsed.data.address, 300), opening_hours: parsed.data.openingHours ?? null, entry_fee: parsed.data.entryFee ?? null, best_time: parsed.data.bestTime ?? null, ...(parsed.data.image ? { image: parsed.data.image } : {}), division_id: parsed.data.divisionId ?? null, district_id: parsed.data.districtId ?? null, upazila_id: parsed.data.upazilaId ?? null });
+if (imageChanged && parsed.data.image && !isValidAdminPlaceImageUrl(parsed.data.image, user.id)) {
+return { error: "The selected place image could not be verified. Please upload it again." };
+}
+const updated = await updateAdminRow("places", id, { name: sanitizeText(parsed.data.name, 200), slug: slugify(parsed.data.name), category: parsed.data.category, summary: sanitizeText(parsed.data.summary, 10_000), description: sanitizeMultiline(parsed.data.description), address: sanitizeText(parsed.data.address, 300), opening_hours: parsed.data.openingHours ?? null, entry_fee: parsed.data.entryFee ?? null, best_time: parsed.data.bestTime ?? null, ...(imageChanged ? { image: parsed.data.image || "/images/places/p1.svg" } : {}), division_id: parsed.data.divisionId ?? null, district_id: parsed.data.districtId ?? null, upazila_id: parsed.data.upazilaId ?? null });
 if (!updated) return { error: "Place not found." };
 await audit(user, "place:update", "place", id);
 revalidatePath("/admin/places");

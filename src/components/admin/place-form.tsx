@@ -12,9 +12,10 @@ divisions: LocationOption[];
 districts: DistrictOption[];
 upazilas: UpazilaOption[];
 categories: ContentCategory[];
+userId: string;
 /** When provided the form edits this record instead of creating one. */
 record?: Place; };
-export function PlaceForm({ divisions, districts, upazilas, categories, record }: Props) {
+export function PlaceForm({ divisions, districts, upazilas, categories, userId, record }: Props) {
 const action = record ? adminUpdatePlaceAction : createPlaceAction;
 const [state, formAction, pending] = useActionState<AdminFormState, FormData>(
 action as unknown as (prev: AdminFormState, fd: FormData) => Promise<AdminFormState>,
@@ -22,11 +23,16 @@ action as unknown as (prev: AdminFormState, fd: FormData) => Promise<AdminFormSt
 );
 const formRef = useRef<HTMLFormElement>(null);
 const [resetKey, setResetKey] = useState(0);
+const [imageChanged, setImageChanged] = useState(false);
+const [imageUploading, setImageUploading] = useState(false);
 useFormStateToast(state);
 useEffect(() => {
-if (!record && state.success) {
+if (state.success) {
+setImageChanged(false);
+if (!record) {
 formRef.current?.reset();
 setResetKey((key) => key + 1);
+}
 }
 }, [record, state]);
 return (
@@ -34,6 +40,7 @@ return (
 <h2 className="font-semibold text-slate-900">{record ? "Update place" : "Add a new place"}</h2>
 {!record && <p className="text-sm text-slate-600">Places created here are published immediately and marked as verified.</p>}
 {record && <input type="hidden" name="id" value={record.id} />}
+<input type="hidden" name="imageChanged" value={imageChanged ? "true" : "false"} />
 <div className="grid gap-4 sm:grid-cols-2">
 <Field label="Name" htmlFor="place-name" required>
 <Input id="place-name" name="name" required defaultValue={record?.name ?? ""} placeholder="e.g. Sajek Valley" />
@@ -67,7 +74,17 @@ districtId: record?.districtId ?? undefined,
 upazilaId: record?.upazilaId ?? undefined,
 }}
 />
-<ImageUpload key={`image-${resetKey}`} name="image" label="Place image" hint="Upload an image from your device, or leave as is" current={record?.image} />
+<ImageUpload
+key={`image-${resetKey}`}
+name="image"
+label="Place image"
+hint="Upload a new image to replace it. The current image stays unchanged if you do not select another."
+current={record?.image}
+userId={userId}
+storageFolder="places"
+onValueChange={() => setImageChanged(true)}
+onUploadingChange={setImageUploading}
+/>
 <div className="grid gap-4 sm:grid-cols-3">
 <Field label="Opening hours" htmlFor="place-hours" hint="Optional">
 <Input id="place-hours" name="openingHours" defaultValue={record?.openingHours ?? ""} placeholder="All day" />
@@ -81,7 +98,7 @@ upazilaId: record?.upazilaId ?? undefined,
 </div>
 {state.error && <p role="alert" className="text-sm text-accent-600">{state.error}</p>}
 {state.success && <p role="status" className="text-sm text-emerald-600">{state.success}</p>}
-<Button type="submit" disabled={pending}>
+<Button type="submit" disabled={pending || imageUploading}>
 {pending ? "Saving…" : record ? "Save changes" : "Create place"}
 </Button>
 </form>
