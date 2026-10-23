@@ -3,6 +3,7 @@
 import Link from "next/link"; import { useActionState } from "react";
 import { googleOAuthAction, registerAction, resendRegistrationCodeAction, verifyRegistrationAction, type FormState } from "@/features/auth/actions"; import { BLOOD_GROUPS, GENDERS } from "@/lib/constants"; import { Button } from "@/components/ui/button"; import { Field, Input } from "@/components/ui/input"; import { LocationFields } from "@/components/forms/location-fields"; import { useFormStateToast } from "@/components/ui/toast"; import type { DistrictOption, LocationOption, UpazilaOption } from "@/components/search/directory-filters";
 import { Spinner } from "@/components/ui/spinner"; import { FormPendingButton } from "@/components/ui/form-pending-button";
+import { DateInput } from "@/components/ui/date-input";
 type Props = {
 divisions: LocationOption[];
 districts: DistrictOption[];
@@ -79,7 +80,7 @@ return (<div>
 </select>
 </Field>
 <Field label="Date of birth" htmlFor="dateOfBirth" hint="Optional">
-<Input id="dateOfBirth" name="dateOfBirth" type="date" />
+<DateInput id="dateOfBirth" name="dateOfBirth" />
 </Field>
 </div>
 <div className="mt-4">

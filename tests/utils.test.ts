@@ -1,6 +1,7 @@
 // @ts-nocheck
 import { describe, expect, it } from "vitest";
 import { formatDate, relativeTime, initials, excerpt, toPublicUser, paginate, slugify } from "../src/lib/utils";
+import { formatDayFirstDate, parseDayFirstDate } from "../src/lib/date-input";
 
 describe("utils", () => {
   it("slugify converts text to slug", () => {
@@ -10,7 +11,14 @@ describe("utils", () => {
 
   it("formatDate returns formatted date", () => {
     const result = formatDate("2026-01-15T00:00:00.000Z");
-    expect(result).toContain("2026");
+    expect(result).toBe("15/01/2026");
+  });
+
+  it("formats and parses day-first form dates without changing ISO values", () => {
+    expect(formatDayFirstDate("2026-10-24")).toBe("24/10/2026");
+    expect(parseDayFirstDate("24/10/2026")).toBe("2026-10-24");
+    expect(parseDayFirstDate("31/02/2026")).toBeNull();
+    expect(parseDayFirstDate("2026-10-24")).toBeNull();
   });
 
   it("relativeTime returns relative time string", () => {

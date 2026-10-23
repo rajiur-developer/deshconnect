@@ -1,9 +1,9 @@
 "use client";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
 import { getInsForgeBrowserClient } from "@/lib/insforge-browser";
 import type { Message } from "@/types/community";
 import { relativeTime } from "@/lib/utils";
-import { deleteOwnMessageAction, editOwnMessageAction, toggleMessageReactionAction } from "@/features/account/actions";
+import { deleteMessageForMeAction, deleteOwnMessageAction, editOwnMessageAction, toggleMessageReactionAction } from "@/features/account/actions";
 import type { PublicUser } from "@/types/auth";
 import { Spinner } from "@/components/ui/spinner";
 
@@ -25,6 +25,7 @@ export function RealtimeMessageList({ conversationId, viewerId, participantId, i
   const [touchMenuMessageId, setTouchMenuMessageId] = useState<string | null>(null);
   const touchTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const touchTriggered = useRef(false);
+  const menuRef = useRef<HTMLDivElement>(null);
   const cancelTouchTimer = () => { if (touchTimer.current) clearTimeout(touchTimer.current); touchTimer.current = null; };
   useEffect(() => () => { if (touchTimer.current) clearTimeout(touchTimer.current); }, []);
   const addMessage = useCallback((message: RenderMessage) => setMessages((current) => {
@@ -76,11 +77,35 @@ export function RealtimeMessageList({ conversationId, viewerId, participantId, i
   }, [conversationId]);
   useEffect(() => {
     if (!menu && !touchMenuMessageId) return;
-    const dismiss = () => { setMenu(null); setTouchMenuMessageId(null); setForwardingId(null); };
-    window.addEventListener("click", dismiss);
+    const dismiss = () => {
+      setMenu(null);
+      setTouchMenuMessageId(null);
+      setForwardingId(null);
+    };
+    const dismissOutside = (event: PointerEvent) => {
+      if (event.target instanceof Node && menuRef.current?.contains(event.target)) return;
+      dismiss();
+    };
+    const dismissOnEscape = (event: KeyboardEvent) => {
+      if (event.key === "Escape") dismiss();
+    };
+    window.addEventListener("pointerdown", dismissOutside);
+    window.addEventListener("keydown", dismissOnEscape);
     window.addEventListener("scroll", dismiss, true);
-    return () => { window.removeEventListener("click", dismiss); window.removeEventListener("scroll", dismiss, true); };
+    return () => {
+      window.removeEventListener("pointerdown", dismissOutside);
+      window.removeEventListener("keydown", dismissOnEscape);
+      window.removeEventListener("scroll", dismiss, true);
+    };
   }, [menu, touchMenuMessageId]);
+  useLayoutEffect(() => {
+    if (!menu) return;
+    const rect = menuRef.current?.getBoundingClientRect();
+    if (!rect) return;
+    const x = Math.max(8, Math.min(menu.x, window.innerWidth - rect.width - 8));
+    const y = Math.max(8, Math.min(menu.y, window.innerHeight - rect.height - 8));
+    if (x !== menu.x || y !== menu.y) setMenu({ ...menu, x, y });
+  }, [menu, forwardingId]);
   useEffect(() => {
     let active = true;
     const client = getInsForgeBrowserClient();
@@ -106,7 +131,7 @@ export function RealtimeMessageList({ conversationId, viewerId, participantId, i
     if (!unresolvedKeys.length) return () => { active = false; };
     void Promise.all(unresolvedKeys.map(async (key) => {
       try {
-        const { data, error } = await client.storage.from("chat-media").createSignedUrl(key, 3600);
+        const { data, error } = await client.storage.from("record-attachments").createSignedUrl(key, 3600);
         return data?.signedUrl ? { key, url: data.signedUrl } : { key, failed: Boolean(error) };
       } catch {
         return { key, failed: true };
@@ -125,10 +150,10 @@ export function RealtimeMessageList({ conversationId, viewerId, participantId, i
       const mine = message.senderId === viewerId;
       const media = message.attachmentKey ? mediaUrls[message.attachmentKey] : null;
       const menuOpen = menu?.messageId === message.id || touchMenuMessageId === message.id;
-      const openMenuAt = (x: number, y: number) => { setMenu({ messageId: message.id, x: Math.max(8, Math.min(x, window.innerWidth - 256)), y: Math.max(8, Math.min(y, window.innerHeight - 400)) }); setTouchMenuMessageId(null); setForwardingId(null); };
+      const openMenuAt = (x: number, y: number) => { setMenu({ messageId: message.id, x: Math.max(8, x), y: Math.max(8, y) }); setTouchMenuMessageId(message.id); setForwardingId(null); };
       const replyTarget = message.replyToMessageId ? messages.find((candidate) => candidate.id === message.replyToMessageId) : null;
       const groupedReactions = Object.entries((message.reactions ?? []).reduce<Record<string, string[]>>((groups, reaction) => { (groups[reaction.emoji] ??= []).push(reaction.userId); return groups; }, {}));
-      return <div key={message.id} className={`flex ${mine ? "justify-end" : "justify-start"} ${message.deliveryState ? "message-enter" : ""}`}><div onContextMenu={(event) => { if (message.deliveryState) return; event.preventDefault(); openMenuAt(event.clientX, event.clientY); }} onTouchStart={(event) => { if (message.deliveryState) return; touchTriggered.current = false; const touch = event.touches[0]; if (!touch) return; const x = touch.clientX; const y = touch.clientY; cancelTouchTimer(); touchTimer.current = setTimeout(() => { touchTriggered.current = true; setMenu(null); setTouchMenuMessageId(message.id); setMenu({ messageId: message.id, x: Math.max(8, Math.min(x, window.innerWidth - 220)), y: Math.max(8, Math.min(y, window.innerHeight - 250)) }); }, 550); }} onTouchMove={cancelTouchTimer} onTouchEnd={cancelTouchTimer} onTouchCancel={cancelTouchTimer} onClick={(event) => { if (touchTriggered.current) { event.preventDefault(); event.stopPropagation(); touchTriggered.current = false; } }} className={`relative max-w-[80%] rounded-2xl px-4 py-2 text-sm ${mine ? "bg-brand-600 text-white" : "bg-slate-100 text-slate-800"} ${message.deliveryState ? "opacity-80" : ""}`}>
+      return <div key={message.id} className={`flex ${mine ? "justify-end" : "justify-start"} ${message.deliveryState ? "message-enter" : ""}`}><div onContextMenu={(event) => { if (message.deliveryState) return; event.preventDefault(); openMenuAt(event.clientX, event.clientY); }} onTouchStart={(event) => { if (message.deliveryState) return; touchTriggered.current = false; const touch = event.touches[0]; if (!touch) return; const x = touch.clientX; const y = touch.clientY; cancelTouchTimer(); touchTimer.current = setTimeout(() => { touchTriggered.current = true; openMenuAt(x, y); }, 550); }} onTouchMove={cancelTouchTimer} onTouchEnd={cancelTouchTimer} onTouchCancel={cancelTouchTimer} onClick={(event) => { if (touchTriggered.current) { event.preventDefault(); event.stopPropagation(); touchTriggered.current = false; } }} className={`relative max-w-[80%] rounded-2xl px-4 py-2 text-sm ${mine ? "bg-brand-600 text-white" : "bg-slate-100 text-slate-800"} ${message.deliveryState ? "opacity-80" : ""}`}>
         {replyTarget && <div className={`mb-2 rounded-lg border-l-2 px-2 py-1 text-xs ${mine ? "border-white/60 bg-white/10 text-brand-50" : "border-brand-500 bg-white/70 text-slate-600"}`}><span className="font-semibold">Reply to {replyTarget.senderId === viewerId ? "you" : "member"}</span><p className="truncate">{replyTarget.body || (replyTarget.attachmentType === "image" ? "Image" : "Voice message")}</p></div>}
         {editing === message.id ? <form className="space-y-2" onSubmit={async (event) => { event.preventDefault(); setPendingMessage(message.id); setActionError(""); const result = await editOwnMessageAction(message.id, editBody); if (result.ok && result.message) { setMessages((current) => current.map((item) => item.id === message.id ? { ...item, ...result.message } as Message : item)); setEditing(null); window.dispatchEvent(new CustomEvent("chat-message-updated", { detail: result.message })); } else setActionError(result.error || "Could not update message."); setPendingMessage(null); }}><textarea aria-label="Edit message" className="w-full rounded-lg border border-white/30 bg-white/10 p-2 text-sm text-inherit" value={editBody} onChange={(event) => setEditBody(event.target.value)} maxLength={2000} /><div className="flex gap-2"><button disabled={pendingMessage === message.id} className="text-xs font-semibold underline">Save</button><button type="button" onClick={() => setEditing(null)} className="text-xs underline">Cancel</button></div></form> : message.body && <p className="whitespace-pre-line">{message.body}</p>}
         {message.deliveryState === "sending" && message.optimisticAttachmentType && <p className="mt-1 text-xs opacity-75">Sending {message.optimisticAttachmentType}…</p>}
@@ -139,10 +164,12 @@ export function RealtimeMessageList({ conversationId, viewerId, participantId, i
           : <p className="mt-1 text-xs opacity-70">Loading attachment…</p>)}
         <div className={`mt-1 flex items-center gap-2 text-[10px] ${mine ? "text-brand-100" : "text-slate-400"}`}><span>{relativeTime(message.createdAt)}{message.editedAt ? " · Edited" : ""}</span>{mine && <span className="inline-flex items-center gap-1 font-medium">{message.deliveryState === "sending" ? <><Spinner className="h-3 w-3 border" /> Sending…</> : message.readBy?.includes(participantId) ? "Seen" : message.deliveredTo?.includes(participantId) ? "Delivered" : "Sent"}</span>}</div>
         {groupedReactions.length > 0 && <div className="mt-1 flex flex-wrap gap-1" aria-label="Message reactions">{groupedReactions.map(([emoji, userIds]) => <button key={emoji} type="button" title={`${userIds.length} reaction${userIds.length === 1 ? "" : "s"}`} aria-label={`${emoji}, ${userIds.length} reaction${userIds.length === 1 ? "" : "s"}`} aria-pressed={userIds.includes(viewerId)} onClick={async (event) => { event.stopPropagation(); const result = await toggleMessageReactionAction(message.id, emoji); if (result.ok && result.reactions) { const updated = { ...message, reactions: result.reactions }; setMessages((current) => current.map((item) => item.id === message.id ? updated : item)); window.dispatchEvent(new CustomEvent("chat-message-updated", { detail: updated })); } else setActionError(result.error || "Could not save reaction."); }} className={`rounded-full border px-1.5 py-0.5 text-xs ${userIds.includes(viewerId) ? "border-brand-300 bg-brand-50" : "border-slate-200 bg-white/80"}`}>{emoji} {userIds.length}</button>)}</div>}
-        {menuOpen && menu && <div role="menu" aria-label="Message actions" onClick={(event) => event.stopPropagation()} className="fixed z-50 max-h-[80vh] min-w-52 overflow-y-auto rounded-xl border border-slate-200 bg-white p-1.5 text-slate-800 shadow-xl" style={{ left: menu.x, top: menu.y }}>
+        {menuOpen && menu && <div ref={menuRef} role="menu" aria-label="Message actions" onClick={(event) => event.stopPropagation()} className="fixed z-50 max-h-[80vh] min-w-52 max-w-[calc(100vw-1rem)] overflow-y-auto rounded-xl border border-slate-200 bg-white p-1.5 text-slate-800 shadow-xl" style={{ left: menu.x, top: menu.y }}>
           {!forwardingId ? <>
             <div className="border-b border-slate-100 px-2 pb-1.5"><p className="px-1 py-1 text-xs font-medium text-slate-500">React</p><div className="flex justify-between gap-1">{REACTION_CHOICES.map((emoji) => <button key={emoji} type="button" aria-label={`React ${emoji}`} disabled={pendingMessage === message.id} onClick={async () => { setPendingMessage(message.id); setActionError(""); const result = await toggleMessageReactionAction(message.id, emoji); if (result.ok && result.reactions) { const updated = { ...message, reactions: result.reactions }; setMessages((current) => current.map((item) => item.id === message.id ? updated : item)); window.dispatchEvent(new CustomEvent("chat-message-updated", { detail: updated })); setMenu(null); setTouchMenuMessageId(null); } else setActionError(result.error || "Could not save reaction."); setPendingMessage(null); }} className="rounded-lg px-1.5 py-1 text-lg hover:bg-slate-100 disabled:opacity-50">{emoji}</button>)}</div></div>
-            {mine && <>{message.body?.trim() && <button type="button" role="menuitem" className="block w-full rounded-lg px-3 py-2 text-left text-sm hover:bg-slate-100" onClick={() => { setEditBody(message.body); setEditing(message.id); setActionError(""); setMenu(null); setTouchMenuMessageId(null); }}>Edit message</button>}<button type="button" role="menuitem" disabled={pendingMessage === message.id} className="block w-full rounded-lg px-3 py-2 text-left text-sm text-red-700 hover:bg-red-50 disabled:opacity-50" onClick={async () => { if (!window.confirm("Delete this message? This cannot be undone.")) return; setPendingMessage(message.id); setActionError(""); const result = await deleteOwnMessageAction(message.id); if (result.ok) setMessages((current) => current.filter((item) => item.id !== message.id)); else setActionError(result.error || "Could not delete message."); setPendingMessage(null); setMenu(null); setTouchMenuMessageId(null); }}>Delete message</button></>}
+            {mine && message.body?.trim() && <button type="button" role="menuitem" className="block w-full rounded-lg px-3 py-2 text-left text-sm hover:bg-slate-100" onClick={() => { setEditBody(message.body); setEditing(message.id); setActionError(""); setMenu(null); setTouchMenuMessageId(null); }}>Edit message</button>}
+            {mine && <button type="button" role="menuitem" disabled={pendingMessage === message.id} className="block w-full rounded-lg px-3 py-2 text-left text-sm text-red-700 hover:bg-red-50 disabled:opacity-50" onClick={async () => { if (!window.confirm("Delete this message for everyone? This cannot be undone.")) return; setPendingMessage(message.id); setActionError(""); const result = await deleteOwnMessageAction(message.id); if (result.ok) { setMessages((current) => current.filter((item) => item.id !== message.id)); window.dispatchEvent(new CustomEvent("chat-message-deleted", { detail: message })); } else setActionError(result.error || "Could not delete message for everyone."); setPendingMessage(null); setMenu(null); setTouchMenuMessageId(null); }}>Delete for everyone</button>}
+            <button type="button" role="menuitem" disabled={pendingMessage === message.id} className="block w-full rounded-lg px-3 py-2 text-left text-sm text-red-700 hover:bg-red-50 disabled:opacity-50" onClick={async () => { setPendingMessage(message.id); setActionError(""); const result = await deleteMessageForMeAction(message.id); if (result.ok) { setMessages((current) => current.filter((item) => item.id !== message.id)); window.dispatchEvent(new CustomEvent("chat-message-deleted", { detail: message })); } else setActionError(result.error || "Could not delete message for you."); setPendingMessage(null); setMenu(null); setTouchMenuMessageId(null); }}>Delete for me</button>
             <button type="button" role="menuitem" className="block w-full rounded-lg px-3 py-2 text-left text-sm hover:bg-slate-100" onClick={() => { window.dispatchEvent(new CustomEvent("chat-reply-requested", { detail: { conversationId, messageId: message.id, senderName: mine ? "yourself" : "this member", body: message.body || (message.attachmentType === "image" ? "Image" : "Voice message") } })); setMenu(null); setTouchMenuMessageId(null); }}>Reply</button>
             <button type="button" role="menuitem" disabled={(!message.body?.trim() && !message.attachmentKey) || !forwardTargets.length || !onForward} className="block w-full rounded-lg px-3 py-2 text-left text-sm hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-50" onClick={() => setForwardingId(message.id)}>Forward</button>
           </> : <><div className="px-3 py-2 text-xs font-semibold text-slate-500">Forward to…</div><button type="button" className="block w-full rounded-lg px-3 py-2 text-left text-xs text-slate-600 hover:bg-slate-100" onClick={() => setForwardingId(null)}>← Back</button>{forwardTargets.map((target) => <button key={target.id} type="button" disabled={pendingMessage === message.id} role="menuitem" className="block w-full rounded-lg px-3 py-2 text-left text-sm hover:bg-slate-100 disabled:opacity-50" onClick={async () => { if (!onForward) return; setPendingMessage(message.id); setActionError(""); try { await onForward(message, target); setMenu(null); setTouchMenuMessageId(null); } catch (error) { setActionError(error instanceof Error ? error.message : "Could not forward message."); } finally { setPendingMessage(null); } }}>{target.fullName}</button>)}</>}

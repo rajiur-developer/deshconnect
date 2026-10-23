@@ -1,0 +1,40 @@
+CREATE OR REPLACE FUNCTION public.can_upload_chat_media(target_conversation_id uuid)
+RETURNS boolean
+LANGUAGE sql
+STABLE
+SECURITY DEFINER
+SET search_path = public, pg_temp
+AS $$
+  SELECT EXISTS (
+    SELECT 1
+    FROM public.conversations c
+    WHERE c.id = target_conversation_id
+      AND auth.uid() = ANY(c.participant_ids)
+      AND (
+        c.conversation_type = 'blood'
+        OR EXISTS (
+          SELECT 1
+          FROM public.connections edge
+          WHERE edge.status = 'accepted'
+            AND (
+              (edge.requester_id = auth.uid() AND edge.addressee_id = ANY(array_remove(c.participant_ids, auth.uid())))
+              OR (edge.addressee_id = auth.uid() AND edge.requester_id = ANY(array_remove(c.participant_ids, auth.uid())))
+            )
+        )
+      )
+  );
+$$;
+
+REVOKE ALL ON FUNCTION public.can_upload_chat_media(uuid) FROM PUBLIC, anon;
+GRANT EXECUTE ON FUNCTION public.can_upload_chat_media(uuid) TO authenticated;
+
+DROP POLICY IF EXISTS chat_media_sender_upload ON storage.objects;
+CREATE POLICY chat_media_sender_upload ON storage.objects
+  FOR INSERT TO authenticated
+  WITH CHECK (
+    bucket = 'chat-media'
+    AND (storage.foldername(key))[1] = (SELECT auth.uid()::text)
+    AND (storage.foldername(key))[2] ~ '^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$'
+    AND storage.filename(key) ~* '\.(jpe?g|png|webp|webm|mp4|m4a|mp3|ogg|wav|aac)$'
+    AND public.can_upload_chat_media((storage.foldername(key))[2]::uuid)
+  );

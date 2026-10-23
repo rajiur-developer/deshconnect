@@ -151,7 +151,7 @@ export function MessagesInbox({ userId, chats, initialUsername, initialUnreadMes
     try {
       let attachment: { key: string; url: string; mimeType: string; type: "image" | "audio" } | undefined;
       if (message.attachmentKey) {
-        const { data: signed, error: signedError } = await client.storage.from("chat-media").createSignedUrl(message.attachmentKey, 300);
+        const { data: signed, error: signedError } = await client.storage.from("record-attachments").createSignedUrl(message.attachmentKey, 300);
         if (signedError || !signed?.signedUrl) throw new Error("Could not prepare the attachment for forwarding.");
         const response = await fetch(signed.signedUrl);
         if (!response.ok) throw new Error("Could not download the attachment for forwarding.");
@@ -163,7 +163,7 @@ export function MessagesInbox({ userId, chats, initialUsername, initialUnreadMes
         const extension = message.attachmentKey.split(".").pop()?.toLowerCase() || (type === "image" ? "jpg" : "webm");
         const key = `${userId}/${conversation.conversationId}/${crypto.randomUUID()}.${extension}`;
         const file = new File([blob], `forwarded.${extension}`, { type: mimeType });
-        const { data: uploaded, error: uploadError } = await client.storage.from("chat-media").upload(key, file);
+        const { data: uploaded, error: uploadError } = await client.storage.from("record-attachments").upload(key, file);
         if (uploadError) throw new Error(uploadError.message || "Could not upload the forwarded attachment.");
         uploadedKey = key;
         if (!uploaded?.url) throw new Error("The attachment uploaded, but its link could not be saved.");
@@ -175,7 +175,7 @@ export function MessagesInbox({ userId, chats, initialUsername, initialUnreadMes
       window.dispatchEvent(new CustomEvent("chat-message-sent", { detail: result.message }));
       uploadedKey = null;
     } finally {
-      if (uploadedKey) await client.storage.from("chat-media").remove(uploadedKey);
+      if (uploadedKey) await client.storage.from("record-attachments").remove(uploadedKey);
     }
   }, [userId]);
 

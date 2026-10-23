@@ -6,6 +6,7 @@ createBloodRequestAction,
 registerDonorAction,
 type BloodFormState, } from "@/features/blood/actions"; import { BLOOD_GROUPS } from "@/lib/constants"; import { Button } from "@/components/ui/button"; import { Field, Input, Textarea } from "@/components/ui/input"; import { LocationFields } from "@/components/forms/location-fields"; import { useFormStateToast } from "@/components/ui/toast"; import type { DistrictOption, LocationOption, UpazilaOption } from "@/components/search/directory-filters";
 import { getDonationEligibility, isValidBloodDonationDate } from "@/lib/blood-donation";
+import { DateInput } from "@/components/ui/date-input";
 import type { DonorAvailability, ContactMethod } from "@/types/blood";
 type LocationProps = {
 divisions: LocationOption[];
@@ -92,15 +93,12 @@ You can mark yourself Ready in <strong>{cooldownLabel(eligibility.remainingMs)}<
 <Field label="WhatsApp number" htmlFor="whatsapp" required hint="Shown publicly on your donor card when you consent below.">
 <Input id="whatsapp" name="whatsapp" type="tel" defaultValue={profile?.whatsapp ?? ""} placeholder="01712345678" required />
 </Field>
-<Field label="Other contact info" htmlFor="contactValue" required hint="Enter an email or another way to reach you.">
-<Input id="contactValue" name="contactValue" defaultValue={profile?.contactValue ?? ""} placeholder="name@example.com" required />
-</Field>
+
 </div>
 <LocationFields idPrefix="donor-" divisions={divisions} districts={districts} upazilas={upazilas} current={{ divisionId: profile?.divisionId ?? undefined, districtId: profile?.districtId ?? undefined, upazilaId: profile?.upazilaId ?? undefined }} required />
 <div className="grid gap-3 sm:grid-cols-2">
 <Field label="Last donation date" htmlFor="lastDonationAt" required hint="Ready status becomes available 75 days after this date.">
-<Input id="lastDonationAt" name="lastDonationAt" type="date" value={lastDonationAt} max={todayDate()} onChange={(event) => {
-const value = event.target.value;
+<DateInput id="lastDonationAt" name="lastDonationAt" value={lastDonationAt} max={todayDate()} onChange={(value) => {
 setLastDonationAt(value);
 if (!isValidBloodDonationDate(value)) setAvailability((current) => current === "available" ? "busy" : current);
 }} required />
@@ -155,15 +153,15 @@ return (
 </div>
 <div className="grid gap-3 sm:grid-cols-2">
 <Field label="Date needed" htmlFor="neededBy" required>
-<Input id="neededBy" name="neededBy" type="date" min={todayDate()} required />
+<DateInput id="neededBy" name="neededBy" min={todayDate()} required />
 </Field>
 <Field label="Patient name" htmlFor="patient" required>
 <Input id="patient" name="patient" placeholder="Patient" required />
 </Field>
 </div>
 <LocationFields idPrefix="request-" divisions={divisions} districts={districts} upazilas={upazilas} current={{}} required />
-<Field label="Additional info" htmlFor="req-notes" hint="Optional">
-<Textarea id="req-notes" name="notes" placeholder="Ward, doctor or other details" />
+<Field label="Additional info" htmlFor="req-notes" hint="Optional — add the patient's condition, hemoglobin level, ward, or other helpful details.">
+<Textarea id="req-notes" name="notes" placeholder="Patient condition, hemoglobin level, ward or doctor details" />
 </Field>
 {state.error && <p role="alert" className="text-sm text-accent-600">{state.error}</p>}
 {state.success && <p role="status" className="text-sm text-emerald-600">{state.success}</p>}

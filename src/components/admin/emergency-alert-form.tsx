@@ -1,6 +1,7 @@
 // @ts-nocheck
 "use client";
 import { useActionState } from "react";
+import { DateInput } from "@/components/ui/date-input";
 import { sendEmergencyBloodAlertAction, type AdminFormState } from "@/features/admin/actions"; import { BLOOD_GROUPS } from "@/lib/constants"; import { Button } from "@/components/ui/button"; import { Field, Input, Textarea } from "@/components/ui/input";
 export function EmergencyAlertForm() {
 const [state, formAction, pending] = useActionState<AdminFormState, FormData>(
@@ -31,7 +32,7 @@ Creates an active blood request and sends a notification to every registered use
 </Field>
 <div className="grid gap-4 sm:grid-cols-2">
 <Field label="Needed by" htmlFor="alert-needed" required>
-<Input id="alert-needed" name="neededBy" type="date" required />
+<DateInput id="alert-needed" name="neededBy" required />
 </Field>
 </div>
 <Field label="Notes" htmlFor="alert-notes" hint="Optional">

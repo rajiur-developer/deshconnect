@@ -1,0 +1,1 @@
+REVOKE ALL ON FUNCTION public.delete_expired_blood_requests() FROM PUBLIC, anon, authenticated;

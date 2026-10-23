@@ -162,7 +162,7 @@ const keyParts = attachment.key.split("/");
 let validUrl = false;
 try {
 const url = new URL(attachment.url);
-validUrl = url.origin === new URL(process.env.NEXT_PUBLIC_INSFORGE_URL!).origin && decodeURIComponent(url.pathname).includes("chat-media") && decodeURIComponent(url.pathname).includes(attachment.key);
+validUrl = url.origin === new URL(process.env.NEXT_PUBLIC_INSFORGE_URL!).origin && decodeURIComponent(url.pathname).includes("record-attachments") && decodeURIComponent(url.pathname).includes(attachment.key);
 } catch { validUrl = false; }
 if (keyParts.length !== 3 || keyParts[0] !== user.id || keyParts[1] !== conversationId || !/^[a-zA-Z0-9-]{12,80}\.[a-z0-9]{2,6}$/i.test(keyParts[2]) || !validUrl || !attachmentTypes.has(attachment.mimeType) || !["image", "audio"].includes(attachment.type) || (attachment.type === "image") !== attachment.mimeType.startsWith("image/")) {
 return { ok: false, error: "The selected image or voice message is invalid. Please select it again." };
@@ -245,10 +245,73 @@ revalidatePath("/messages");
 return { ok: true, count: Number(data ?? 0) };
 }
 export async function markConversationMessagesDeliveredAction(conversationId: string): Promise<void> {
-  const user = await requireUser();
+  const client = createServerClient({ cookies: await cookies() });
+  const { data, error: authError } = await client.auth.getCurrentUser();
+  if (authError || !data?.user) return;
   if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(conversationId)) return;
-  const { error } = await insforge.database.rpc("mark_conversation_messages_delivered", { target_conversation_id: conversationId });
-  if (error) console.error(`Could not mark messages delivered for ${user.id}:`, error.message);
+  const { error } = await client.database.rpc("mark_conversation_messages_delivered", { target_conversation_id: conversationId });
+  if (error) console.error(`Could not mark messages delivered for ${data.user.id}:`, error.message);
+}
+
+export async function getMessageNotificationSnapshotAction(since: string) {
+  const client = createServerClient({ cookies: await cookies() });
+  const { data, error: authError } = await client.auth.getCurrentUser();
+  if (authError || !data?.user) {
+    return { authenticated: false as const, conversations: [], unreadMessages: [], messages: [] };
+  }
+  const user = data.user;
+  const cursor = Number.isNaN(Date.parse(since)) ? new Date().toISOString() : since;
+  const { data: conversations, error: conversationsError } = await client.database
+    .from("conversations")
+    .select("id,participant_ids")
+    .eq("conversation_type", "connection")
+    .filter("participant_ids", "cs", `{${user.id}}`)
+    .limit(200);
+  if (conversationsError) throw new Error(`Could not load message conversations: ${conversationsError.message}`);
+
+  const conversationIds = (conversations ?? []).map((conversation: any) => conversation.id);
+  const [unreadResult, messageResult] = await Promise.all([
+    client.database.rpc("get_unread_message_counts"),
+    conversationIds.length
+      ? client.database
+          .from("messages")
+          .select("id,conversation_id,sender_id,body,attachment_key,attachment_url,attachment_mime_type,attachment_type,reply_to_message_id,reactions,created_at,read_by,delivered_to,edited_at")
+          .in("conversation_id", conversationIds)
+          .gt("created_at", cursor)
+          .order("created_at", { ascending: true })
+          .limit(100)
+      : Promise.resolve({ data: [], error: null }),
+  ]);
+  if (unreadResult.error) throw new Error(`Could not refresh unread message counts: ${unreadResult.error.message}`);
+  if (messageResult.error) throw new Error(`Could not load recent messages: ${messageResult.error.message}`);
+
+  return {
+    authenticated: true as const,
+    conversations: (conversations ?? []).flatMap((conversation: any) => {
+      const memberId = (conversation.participant_ids ?? []).find((id: string) => id !== user.id);
+      return memberId ? [{ id: conversation.id, memberId }] : [];
+    }),
+    unreadMessages: (unreadResult.data ?? []).map((row: any) => ({
+      conversationId: row.conversation_id,
+      count: Number(row.unread_count ?? 0),
+    })),
+    messages: (messageResult.data ?? []).map((message: any) => ({
+      id: message.id,
+      conversationId: message.conversation_id,
+      senderId: message.sender_id,
+      body: message.body ?? "",
+      attachmentKey: message.attachment_key ?? null,
+      attachmentUrl: message.attachment_url ?? null,
+      attachmentMimeType: message.attachment_mime_type ?? null,
+      attachmentType: message.attachment_type ?? null,
+      replyToMessageId: message.reply_to_message_id ?? null,
+      reactions: message.reactions ?? [],
+      createdAt: message.created_at,
+      readBy: message.read_by ?? [],
+      deliveredTo: message.delivered_to ?? [],
+      editedAt: message.edited_at ?? null,
+    })),
+  };
 }
 
 async function canManageOwnMessage(messageId: string, userId: string) {
@@ -286,12 +349,30 @@ export async function deleteOwnMessageAction(messageId: string): Promise<{ ok: b
   const { error } = await insforge.database.from("messages").delete().eq("id", messageId).eq("sender_id", user.id);
   if (error) return { ok: false, error: "Could not delete this message. Please try again." };
   if (owned.attachment_key) {
-    const { error: storageError } = await insforge.storage.from("chat-media").remove(owned.attachment_key);
+    const { error: storageError } = await insforge.storage.from("record-attachments").remove(owned.attachment_key);
     if (storageError) console.warn("Could not remove deleted chat attachment:", storageError.message);
   }
   revalidatePath(`/messages/${owned.conversationId}`);
   return { ok: true };
 }
+
+export async function deleteMessageForMeAction(messageId: string): Promise<{ ok: boolean; error?: string }> {
+  await requireUser();
+  if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(messageId)) {
+    return { ok: false, error: "This message is unavailable." };
+  }
+
+  const { data, error } = await insforge.database.rpc("hide_chat_message_for_current_user", {
+    target_message_id: messageId,
+  });
+  if (error || data !== true) {
+    if (error) console.error("Could not hide chat message for current user:", error.message);
+    return { ok: false, error: "Could not delete this message for you. Please try again." };
+  }
+
+  return { ok: true };
+}
+
 export async function toggleMessageReactionAction(messageId: string, emoji: string): Promise<{ ok: boolean; error?: string; reactions?: Array<{ userId: string; emoji: string }> }> {
   const user = await requireUser();
   if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(messageId)) return { ok: false, error: "This message is unavailable." };

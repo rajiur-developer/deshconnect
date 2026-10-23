@@ -466,6 +466,22 @@ html[lang="bn"] body {
   to { transform: rotate(360deg); }
 }
 
+.chat-recording-bar {
+  width: 3px;
+  height: 18px;
+  border-radius: 9999px;
+  background: currentColor;
+  opacity: 0.6;
+  transform: scaleY(var(--recording-level, 0.12));
+  transition: transform 90ms ease-out, opacity 90ms ease-out;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .chat-recording-bar {
+    transition: none;
+  }
+}
+
 @keyframes confetti-burst {
   0% { opacity: 0; transform: translateY(4px) scale(0.4); }
   20% { opacity: 1; }
