@@ -1,5 +1,6 @@
 node_modules/
 .next/
+.next-dev-3000/
 out/
 coverage/
 *.tsbuildinfo
