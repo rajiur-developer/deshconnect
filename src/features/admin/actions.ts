@@ -204,7 +204,7 @@ const place = {
 slug: `${slugify(parsed.data.name) || "place"}-${createId("place").slice(-8)}`,
 name: sanitizeText(parsed.data.name, 200),
 category: parsed.data.category,
-summary: sanitizeText(parsed.data.summary, 300),
+summary: sanitizeText(parsed.data.summary, 10_000),
 description: sanitizeMultiline(parsed.data.description),
 address: sanitizeText(parsed.data.address, 300),
 latitude: null,
@@ -486,7 +486,7 @@ districtId: formData.get("districtId") || undefined,
 upazilaId: formData.get("upazilaId") || undefined,
 });
 if (!parsed.success) return { error: formatZodError(parsed.error) };
-const updated = await updateAdminRow("places", id, { name: sanitizeText(parsed.data.name, 200), slug: slugify(parsed.data.name), category: parsed.data.category, summary: sanitizeText(parsed.data.summary, 300), description: sanitizeMultiline(parsed.data.description), address: sanitizeText(parsed.data.address, 300), opening_hours: parsed.data.openingHours ?? null, entry_fee: parsed.data.entryFee ?? null, best_time: parsed.data.bestTime ?? null, ...(parsed.data.image ? { image: parsed.data.image } : {}), division_id: parsed.data.divisionId ?? null, district_id: parsed.data.districtId ?? null, upazila_id: parsed.data.upazilaId ?? null });
+const updated = await updateAdminRow("places", id, { name: sanitizeText(parsed.data.name, 200), slug: slugify(parsed.data.name), category: parsed.data.category, summary: sanitizeText(parsed.data.summary, 10_000), description: sanitizeMultiline(parsed.data.description), address: sanitizeText(parsed.data.address, 300), opening_hours: parsed.data.openingHours ?? null, entry_fee: parsed.data.entryFee ?? null, best_time: parsed.data.bestTime ?? null, ...(parsed.data.image ? { image: parsed.data.image } : {}), division_id: parsed.data.divisionId ?? null, district_id: parsed.data.districtId ?? null, upazila_id: parsed.data.upazilaId ?? null });
 if (!updated) return { error: "Place not found." };
 await audit(user, "place:update", "place", id);
 revalidatePath("/admin/places");

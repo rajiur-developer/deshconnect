@@ -139,7 +139,10 @@ export const profileSchema = z.object({
 export const placeSchema = z.object({
   name: z.string().trim().min(2).max(200),
   category: z.string().trim().min(1),
-  summary: z.string().trim().min(1).max(300),
+  summary: z.string().trim().min(1).refine(
+    (value) => value.split(/\s+/).filter(Boolean).length <= 200,
+    "Summary must be 200 words or fewer.",
+  ),
   description: z.string().trim().min(1).max(10000),
   address: z.string().trim().min(1).max(300),
   entryFee: z.string().optional(),

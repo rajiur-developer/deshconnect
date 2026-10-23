@@ -53,8 +53,8 @@ return (
 </select>
 </Field>
 </div>
-<Field label="Summary" htmlFor="place-summary" required>
-<Input id="place-summary" name="summary" required defaultValue={record?.summary ?? ""} placeholder="One or two sentences" />
+<Field label="Summary (up to 200 words)" htmlFor="place-summary" required>
+<Textarea id="place-summary" name="summary" required defaultValue={record?.summary ?? ""} placeholder="Write a summary of the place" />
 </Field>
 <Field label="Description" htmlFor="place-description" required>
 <Textarea id="place-description" name="description" className="min-h-[140px]" required defaultValue={record?.description ?? ""} placeholder="What visitors should know" />
