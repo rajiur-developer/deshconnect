@@ -11,10 +11,12 @@ export function MessageRealtimeNotifications({
   userId,
   conversations,
   pollSince,
+  initialUnreadMessages = [],
 }: {
   userId: string;
   conversations: ConversationChannel[];
   pollSince: string;
+  initialUnreadMessages?: UnreadConversation[];
 }) {
   useEffect(() => {
     const client = getInsForgeBrowserClient();
@@ -25,6 +27,7 @@ export function MessageRealtimeNotifications({
     let verifyingSession = false;
     let cursor = pollSince;
     const seen = new Set<string>();
+    const lastUnreadCounts = new Map(initialUnreadMessages.map(({ conversationId, count }) => [conversationId, count]));
     const channelMembers = new Map(conversations.map(({ id, memberId }) => [`chat:${id}`, memberId]));
     const channels = new Set(channelMembers.keys());
     const subscribed = new Set<string>();
@@ -126,6 +129,27 @@ export function MessageRealtimeNotifications({
         if (active) console.warn("Could not check for missed chat messages:", error);
       }
     };
+    const pollUnreadCounts = async () => {
+      if (!active || document.visibilityState !== "visible") return;
+      try {
+        const { data, error } = await client.database.rpc("get_unread_message_counts");
+        if (error) throw error;
+        const counts = new Map<string, number>(
+          (data ?? []).map((row: any) => [row.conversation_id, Number(row.unread_count ?? 0)]),
+        );
+        const conversationIds = new Set([...lastUnreadCounts.keys(), ...counts.keys()]);
+        for (const conversationId of conversationIds) {
+          const count = counts.get(conversationId) ?? 0;
+          window.dispatchEvent(new CustomEvent("message-unread-change", {
+            detail: { conversationId, unreadCount: count },
+          }));
+        }
+        lastUnreadCounts.clear();
+        counts.forEach((count, conversationId) => lastUnreadCounts.set(conversationId, count));
+      } catch (error) {
+        if (active) console.warn("Could not refresh unread message counts:", error);
+      }
+    };
     const discoverConversations = async () => {
       if (!active || document.visibilityState !== "visible") return;
       try {
@@ -170,6 +194,7 @@ export function MessageRealtimeNotifications({
       }
       void discoverConversations();
       void pollForMessages();
+      void pollUnreadCounts();
       void Promise.all([...channels].filter((channel) => !subscribed.has(channel)).map((channel) => subscribeToChannel(channel))).catch((error) => {
         if (active) console.warn("Could not retry realtime subscriptions:", error);
       });
@@ -232,7 +257,7 @@ export function MessageRealtimeNotifications({
       client.realtime.off("connect", handleConnect);
       subscribed.forEach((channel) => client.realtime.unsubscribe(channel));
     };
-  }, [conversations, userId]);
+  }, [conversations, initialUnreadMessages, userId]);
 
   return null;
 }

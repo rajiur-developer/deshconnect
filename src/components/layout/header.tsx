@@ -29,7 +29,7 @@ unreadMessages = unreadCounts;
 const unreadMessageTotal = unreadMessages.reduce((total, item) => total + item.count, 0);
 return (
 <header className="sticky top-0 z-40 border-b border-slate-200 bg-white/90 shadow-[0_4px_20px_-14px_rgba(11,61,46,0.45)] backdrop-blur">
-{user && <MessageRealtimeNotifications userId={user.id} conversations={messageConversations} pollSince={new Date().toISOString()} />}
+{user && <MessageRealtimeNotifications userId={user.id} conversations={messageConversations} pollSince={new Date().toISOString()} initialUnreadMessages={unreadMessages} />}
 <div className="container-x flex h-16 items-center gap-4">
 <Link href="/" className="flex shrink-0 items-center gap-2 font-bold text-brand-700 logoSize">
 <span className="grid h-14 w-14 place-items-center rounded-lg text-white">

@@ -32,7 +32,11 @@ export type IconName =
 | "plus"
 | "trash"
 | "edit"
-| "flag";
+| "flag"
+| "image"
+| "audio"
+| "mic"
+| "stop";
 const ICONS: Record<IconName, ReactNode> = {
 search: (
 <>
@@ -106,7 +110,23 @@ filter: <path d="M3 5h18l-7 8v6l-4-2v-4L3 5Z" />,
 plus: <path d="M12 5v14M5 12h14" />,
 trash: <path d="M3 6h18M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6" />,
 edit: <path d="M12 20h9M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4 12.5-12.5Z" />,
-flag: <path d="M4 15s1-1 4-1 5 2 8 2 4-1 4-1V4s-1 1-4 1-5-2-8-2-4 1-4 1v11ZM4 22v-7" />, };
+flag: <path d="M4 15s1-1 4-1 5 2 8 2 4-1 4-1V4s-1 1-4 1-5-2-8-2-4 1-4 1v11ZM4 22v-7" />,
+image: (
+<>
+<rect x="3" y="3" width="18" height="18" rx="2" />
+<circle cx="8.5" cy="8.5" r="1.5" />
+<path d="m21 15-5-5L5 21" />
+</>
+),
+audio: <path d="M3 10v4M7 6v12M11 9v6M15 4v16M19 8v8M23 10v4" />,
+mic: (
+<>
+<rect x="9" y="2" width="6" height="12" rx="3" />
+<path d="M5 10a7 7 0 0 0 14 0M12 17v5M8 22h8" />
+</>
+),
+stop: <rect x="5" y="5" width="14" height="14" rx="2" />,
+};
 export function Icon({ name, className, ...props }: { name: IconName; className?: string } & SVGProps<SVGSVGElement>) {
 return (
 <svg

@@ -2,7 +2,7 @@
 "use client";
 import { useActionState, useEffect, useRef, useState, type FormEvent } from "react";
 import { getInsForgeBrowserClient } from "@/lib/insforge-browser";
-import { sendMessageAction, updateProfileAction, type AccountFormState } from "@/features/account/actions"; import { PROFILE_IMAGE_BUCKET, PROFILE_IMAGE_MAX_BYTES, PROFILE_IMAGE_TYPES } from "@/features/account/constants"; import { Button } from "@/components/ui/button"; import { Field, Input, Textarea } from "@/components/ui/input"; import { LocationFields } from "@/components/forms/location-fields"; import { useFormStateToast } from "@/components/ui/toast"; import type { DistrictOption, LocationOption, UpazilaOption } from "@/components/search/directory-filters";
+import { sendMessageAction, updateProfileAction, type AccountFormState } from "@/features/account/actions"; import { PROFILE_IMAGE_BUCKET, PROFILE_IMAGE_MAX_BYTES, PROFILE_IMAGE_TYPES } from "@/features/account/constants"; import { Button } from "@/components/ui/button"; import { Field, Input, Textarea } from "@/components/ui/input"; import { LocationFields } from "@/components/forms/location-fields"; import { useFormStateToast } from "@/components/ui/toast"; import type { DistrictOption, LocationOption, UpazilaOption } from "@/components/search/directory-filters"; import { Icon } from "@/components/ui/icons";
 import { Spinner } from "@/components/ui/spinner";
 type LocationProps = {
 divisions: LocationOption[];
@@ -107,6 +107,7 @@ const [body, setBody] = useState("");
 const [file, setFile] = useState<File | null>(null);
 const [pending, setPending] = useState(false);
 const [recording, setRecording] = useState(false);
+const [messageFocused, setMessageFocused] = useState(false);
 const [error, setError] = useState("");
 const [replyingTo, setReplyingTo] = useState<{ messageId: string; senderName: string; body: string } | null>(null);
 const imageRef = useRef<HTMLInputElement>(null);
@@ -222,17 +223,24 @@ setError(message);
 return (
 <form onSubmit={submitMessage} className={`space-y-2 rounded-lg ${error ? "motion-error" : ""}`}>
 {replyingTo && <div className="flex items-start justify-between gap-3 rounded-lg border-l-2 border-brand-500 bg-brand-50 px-3 py-2 text-xs text-slate-600"><p className="min-w-0"><span className="font-semibold text-slate-800">Replying to {replyingTo.senderName}</span><br /><span className="block truncate">{replyingTo.body}</span></p><button type="button" onClick={() => setReplyingTo(null)} className="shrink-0 text-slate-500 underline">Cancel</button></div>}
-<div className="flex gap-2">
-<Input value={body} onChange={(event) => setBody(event.target.value)} placeholder="Write a message…" aria-label="Message" className="flex-1" maxLength={2000} disabled={pending} />
+<div className="flex items-center gap-2">
+{!messageFocused && <div className="flex shrink-0 items-center gap-1">
+<button type="button" onClick={() => imageRef.current?.click()} disabled={pending} aria-label="Choose image" title="Choose image (max 5 MB)" className="grid h-9 w-9 place-items-center rounded-lg text-slate-600 hover:bg-brand-50 hover:text-brand-700 disabled:opacity-60">
+<Icon name="image" className="h-5 w-5" />
+</button>
+<input ref={imageRef} type="file" accept="image/jpeg,image/png,image/webp" className="sr-only" disabled={pending} onChange={(event) => { const selected = event.target.files?.[0] ?? null; setFile(selected); if (selected && audioRef.current) audioRef.current.value = ""; }} />
+<button type="button" onClick={() => audioRef.current?.click()} disabled={pending} aria-label="Choose voice recording" title="Choose voice recording (max 5 MB)" className="grid h-9 w-9 place-items-center rounded-lg text-slate-600 hover:bg-brand-50 hover:text-brand-700 disabled:opacity-60">
+<Icon name="audio" className="h-5 w-5" />
+</button>
+<input ref={audioRef} type="file" accept="audio/*" className="sr-only" disabled={pending} onChange={(event) => { const selected = event.target.files?.[0] ?? null; setFile(selected); if (selected && imageRef.current) imageRef.current.value = ""; }} />
+<button type="button" onClick={toggleVoiceRecording} disabled={pending} aria-label={recording ? "Stop voice recording" : "Record voice"} title={recording ? "Stop recording" : "Record voice (max 5 MB)"} className={`grid h-9 w-9 place-items-center rounded-lg disabled:opacity-60 ${recording ? "bg-red-50 text-red-700" : "text-slate-600 hover:bg-brand-50 hover:text-brand-700"}`}>
+<Icon name={recording ? "stop" : "mic"} className="h-5 w-5" />
+</button>
+</div>}
+<Input value={body} onChange={(event) => setBody(event.target.value)} onFocus={() => setMessageFocused(true)} onBlur={() => setMessageFocused(false)} placeholder="Write a message…" aria-label="Message" className="min-w-0 flex-1" maxLength={2000} disabled={pending} />
 <Button type="submit" disabled={pending || (!body.trim() && !file)} aria-busy={pending}>{pending && <Spinner />}{pending ? "Sending…" : "Send"}</Button>
 </div>
-<div className="flex flex-wrap items-center gap-3 text-xs text-slate-600">
-<label className={`cursor-pointer hover:text-brand-700 ${pending ? "pointer-events-none opacity-60" : ""}`}>Image<input ref={imageRef} type="file" accept="image/jpeg,image/png,image/webp" className="sr-only" disabled={pending} onChange={(event) => { const selected = event.target.files?.[0] ?? null; setFile(selected); if (selected && audioRef.current) audioRef.current.value = ""; }} /></label>
-<label className={`cursor-pointer hover:text-brand-700 ${pending ? "pointer-events-none opacity-60" : ""}`}>Choose voice<input ref={audioRef} type="file" accept="audio/*" className="sr-only" disabled={pending} onChange={(event) => { const selected = event.target.files?.[0] ?? null; setFile(selected); if (selected && imageRef.current) imageRef.current.value = ""; }} /></label>
-<button type="button" onClick={toggleVoiceRecording} disabled={pending} className="font-medium text-brand-700 hover:text-brand-900 disabled:opacity-60">{recording ? "Stop recording" : "Record voice"}</button>
-{file && <span className="max-w-48 truncate text-slate-500">{file.name}</span>}
-<span className="text-slate-400">Image or voice · max 5 MB</span>
-</div>
+{file && <p className="truncate text-xs text-slate-500" title={file.name}>{file.name} · max 5 MB</p>}
 {error && <p role="alert" className="text-xs text-accent-600">{error}</p>}
 </form>
 ); }
