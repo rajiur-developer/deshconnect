@@ -588,7 +588,13 @@ if (!(await isContentCategory("place", parsed.data.category))) return { error: "
 if (imageChanged && parsed.data.image && !isValidAdminPlaceImageUrl(parsed.data.image, user.id)) {
 return { error: "The selected place image could not be verified. Please upload it again." };
 }
-const updated = await updateAdminRow("places", id, { name: sanitizeText(parsed.data.name, 200), slug: slugify(parsed.data.name), category: parsed.data.category, summary: sanitizeText(parsed.data.summary, 10_000), description: sanitizeMultiline(parsed.data.description), address: sanitizeText(parsed.data.address, 300), opening_hours: parsed.data.openingHours ?? null, entry_fee: parsed.data.entryFee ?? null, best_time: parsed.data.bestTime ?? null, ...(imageChanged ? { image: parsed.data.image || "/images/places/p1.svg" } : {}), division_id: parsed.data.divisionId ?? null, district_id: parsed.data.districtId ?? null, upazila_id: parsed.data.upazilaId ?? null });
+let updated;
+try {
+updated = await updateAdminRow("places", id, { name: sanitizeText(parsed.data.name, 200), category: parsed.data.category, summary: sanitizeText(parsed.data.summary, 10_000), description: sanitizeMultiline(parsed.data.description), address: sanitizeText(parsed.data.address, 300), opening_hours: parsed.data.openingHours ?? null, entry_fee: parsed.data.entryFee ?? null, best_time: parsed.data.bestTime ?? null, ...(imageChanged ? { image: parsed.data.image || "/images/places/p1.svg" } : {}), division_id: parsed.data.divisionId ?? null, district_id: parsed.data.districtId ?? null, upazila_id: parsed.data.upazilaId ?? null });
+} catch (error) {
+console.error("Place update failed.", error instanceof Error ? error.message : "Unknown error");
+return { error: "Could not save this place. Please try again." };
+}
 if (!updated) return { error: "Place not found." };
 await audit(user, "place:update", "place", id);
 revalidatePath("/admin/places");
