@@ -15,6 +15,7 @@
     "@fontsource/galada": "^5.3.0",
     "@fontsource/inter": "^5.3.0",
     "@fontsource/noto-sans-bengali": "^5.3.0",
+    "@fontsource/tiro-bangla": "^5.3.0",
     "@insforge/sdk": "^1.5.2",
     "next": "^15.3.2",
     "react": "^19.1.0",
