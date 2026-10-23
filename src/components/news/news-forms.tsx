@@ -4,14 +4,8 @@ import { useActionState, useRef, useState, type FormEvent } from "react";
 import { getInsForgeBrowserClient } from "@/lib/insforge-browser";
 import { COMMUNITY_POST_IMAGE_BUCKET } from "@/features/account/constants";
 import { submitNewsAction, type NewsFormState } from "@/features/news/actions"; import { Button } from "@/components/ui/button"; import { Field, Input, Textarea } from "@/components/ui/input"; import { useFormStateToast } from "@/components/ui/toast";
-const CATEGORIES = [
-{ value: "national", label: "National" },
-{ value: "district", label: "District" },
-{ value: "health", label: "Health" },
-{ value: "education", label: "Education" },
-{ value: "sports", label: "Sports" },
-{ value: "community", label: "Community" }, ];
-export function NewsSubmitForm({ userId }: { userId: string }) {
+import type { ContentCategory } from "@/services/content-categories";
+export function NewsSubmitForm({ userId, categories }: { userId: string; categories: ContentCategory[] }) {
 const [state, formAction, pending] = useActionState<NewsFormState, FormData>(submitNewsAction, {});
 const [uploading, setUploading] = useState(false);
 const [uploadError, setUploadError] = useState("");
@@ -67,8 +61,8 @@ return (
 <Field label="Category" htmlFor="news-category" required>
 <select id="news-category" name="category" required className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm focus-ring">
 <option value="">Select category</option>
-{CATEGORIES.map((category) => (
-<option key={category.value} value={category.value}>{category.label}</option>
+{categories.map((category) => (
+<option key={category.value} value={category.value}>{category.name}</option>
 ))}
 </select>
 </Field>

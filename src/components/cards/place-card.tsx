@@ -17,7 +17,7 @@ sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 33vw"
 className="object-cover transition-transform duration-500 ease-out group-hover:scale-105"
 />
 <div className="absolute left-3 top-3">
-<Badge tone="brand">{placeCategoryLabelBn(place.category)}</Badge>
+<Badge tone="brand">{place.categoryName ?? placeCategoryLabelBn(place.category)}</Badge>
 </div>
 {place.verification === "verified" && (
 <div className="absolute right-3 top-3">

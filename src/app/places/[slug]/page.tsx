@@ -53,7 +53,7 @@ return (
 <Image src={place.image} alt={place.name} fill priority sizes="(max-width: 1024px) 100vw, 66vw" className="object-cover" />
 </div>
 <div className="mt-4 flex flex-wrap items-center gap-2">
-<Badge tone="brand">{place.category}</Badge>
+<Badge tone="brand">{place.categoryName ?? place.category}</Badge>
 {place.verification === "verified" && <Badge tone="success">Verified listing</Badge>}
 {place.source && <Badge tone="neutral">Source: {place.source}</Badge>}
 </div>

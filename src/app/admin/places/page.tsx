@@ -1,15 +1,16 @@
 // @ts-nocheck
 import Link from "next/link";
-import { insforgeSelectMany } from "@/lib/insforge"; import { mapDbRow } from "@/lib/db/insforge"; import { getDirectoryLocationOptions } from "@/services/locations"; import { Badge, Card } from "@/components/ui/badge"; import { PageHeader } from "@/components/layout/page-header"; import { PlaceForm } from "@/components/admin/place-form"; import { RecordActions } from "@/components/admin/record-actions"; import { formatDate } from "@/lib/utils";
+import { insforgeSelectMany } from "@/lib/insforge"; import { mapDbRow } from "@/lib/db/insforge"; import { getDirectoryLocationOptions } from "@/services/locations"; import { listContentCategories } from "@/services/content-categories"; import { Badge, Card } from "@/components/ui/badge"; import { PageHeader } from "@/components/layout/page-header"; import { PlaceForm } from "@/components/admin/place-form"; import { RecordActions } from "@/components/admin/record-actions"; import { formatDate } from "@/lib/utils";
 export const metadata = { title: "Places" };
 export default async function AdminPlacesPage() {
-const [{ data }, options] = await Promise.all([insforgeSelectMany("places", { order: "updated_at.desc", limit: "500" }), getDirectoryLocationOptions()]);
+const [{ data }, options, categories] = await Promise.all([insforgeSelectMany("places", { order: "updated_at.desc", limit: "500" }), getDirectoryLocationOptions(), listContentCategories("place")]);
 const places = mapDbRow(data || []);
+const categoryNames = new Map(categories.map((category) => [category.value, category.name]));
 return (
 <>
 <PageHeader title="Places" description="Create, edit and delete tourist-place records." />
 <div className="mb-8">
-<PlaceForm divisions={options.divisions} districts={options.districts} upazilas={options.upazilas} />
+<PlaceForm divisions={options.divisions} districts={options.districts} upazilas={options.upazilas} categories={categories} />
 </div>
 <Card className="overflow-x-auto p-0">
 <table className="min-w-full divide-y divide-slate-100 text-sm">
@@ -29,7 +30,7 @@ return (
 <td className="px-4 py-3">
 <Link href={`/places/${place.slug}`} className="font-medium text-slate-900 hover:text-brand-700">{place.name}</Link>
 </td>
-<td className="px-4 py-3 text-slate-600">{place.category}</td>
+<td className="px-4 py-3 text-slate-600">{categoryNames.get(place.category) ?? place.category}</td>
 <td className="px-4 py-3">
 <Badge tone={place.status === "published" ? "success" : "neutral"}>{place.status}</Badge>
 </td>
@@ -43,6 +44,7 @@ return (
 divisions={options.divisions}
 districts={options.districts}
 upazilas={options.upazilas}
+categories={categories}
 record={place}
 />
 </RecordActions>

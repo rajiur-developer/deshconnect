@@ -11,7 +11,7 @@ upazila?: string; };
 export type SeedPlace = SeedLocation & {
 slug: string;
 name: string;
-category: "heritage" | "beach" | "hill" | "forest" | "river" | "park" | "city";
+category: string;
 summary: string;
 description: string;
 address: string;
@@ -69,7 +69,7 @@ title: string;
 excerpt: string;
 body: string;
 image: string;
-category: "national" | "district" | "health" | "education" | "sports" | "community";
+category: string;
 authorUsername: string;
 source?: string; };
 export type SeedReview = {

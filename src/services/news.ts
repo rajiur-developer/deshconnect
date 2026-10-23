@@ -3,6 +3,7 @@ import "server-only";
 
 import { insforgeGet, insforgeInsert, insforgeUpdate, insforgeDelete, insforgeSelectOne, insforgeSelectMany } from "@/lib/insforge";
 import { addTextSearch, makePageMeta } from "@/lib/insforge-query";
+import { listContentCategories } from "@/services/content-categories";
 
 export async function insforgeListNews(query: {
   q?: string;
@@ -31,7 +32,11 @@ export async function insforgeListNews(query: {
   params["limit"] = pageSize.toString();
   params["order"] = query.sort === "name" ? "title.asc" : query.sort === "newest" ? "created_at.desc" : "published_at.desc";
 
-  const { data, count } = await insforgeSelectMany("news", params);
+  const [{ data, count }, categories] = await Promise.all([
+    insforgeSelectMany("news", params),
+    listContentCategories("news"),
+  ]);
+  const categoryNames = new Map(categories.map((category) => [category.value, category.name]));
   return {
     items: (data || []).map((r: any) => ({
       id: r.id,
@@ -41,6 +46,7 @@ export async function insforgeListNews(query: {
       body: r.body,
       image: r.image,
       category: r.category,
+      categoryName: categoryNames.get(r.category) ?? r.category,
       authorId: r.author_id,
       source: r.source,
       status: r.status,
@@ -58,6 +64,8 @@ export async function insforgeListNews(query: {
 export async function insforgeGetNewsBySlug(slug: string) {
   const data = await insforgeSelectOne("news", { slug: `eq.${slug}` });
   if (!data) return null;
+  const categories = await listContentCategories("news");
+  const categoryName = categories.find((category) => category.value === data.category)?.name ?? data.category;
   return {
     id: data.id,
     slug: data.slug,
@@ -66,6 +74,7 @@ export async function insforgeGetNewsBySlug(slug: string) {
     body: data.body,
     image: data.image,
     category: data.category,
+    categoryName,
     authorId: data.author_id,
     source: data.source,
     status: data.status,

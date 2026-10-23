@@ -1,6 +1,6 @@
 // @ts-nocheck
 import Link from "next/link";
-import { requireUser } from "@/lib/auth/current-user"; import { listNews } from "@/services/news"; import { formatDate } from "@/lib/utils"; import { Badge } from "@/components/ui/badge"; import { PageHeader } from "@/components/layout/page-header"; import { NewsSubmitForm } from "@/components/news/news-forms"; import { EmptyState } from "@/components/ui/empty-state"; import { Icon } from "@/components/ui/icons";
+import { requireUser } from "@/lib/auth/current-user"; import { listNews } from "@/services/news"; import { listContentCategories } from "@/services/content-categories"; import { formatDate } from "@/lib/utils"; import { Badge } from "@/components/ui/badge"; import { PageHeader } from "@/components/layout/page-header"; import { NewsSubmitForm } from "@/components/news/news-forms"; import { EmptyState } from "@/components/ui/empty-state"; import { Icon } from "@/components/ui/icons";
 const STATUS_TONE: Record<string, "success" | "accent" | "amber" | "neutral"> = {
 published: "success",
 pending_review: "amber",
@@ -10,7 +10,7 @@ archived: "neutral", };
 export const metadata = { title: "My news", robots: { index: false, follow: false } };
 export default async function MyNewsPage() {
 const user = await requireUser("/my-news");
-const result = await listNews({ authorId: user.id, includeAll: true, page: 1 });
+const [result, categories] = await Promise.all([listNews({ authorId: user.id, includeAll: true, page: 1 }), listContentCategories("news")]);
 return (
 <>
 <PageHeader
@@ -30,7 +30,7 @@ result.items.map((article) => (
 <article key={article.id} className="rounded-2xl border border-slate-200 bg-white p-5">
 <div className="flex items-start justify-between gap-3">
 <div>
-<Badge tone="brand">{article.category}</Badge>
+<Badge tone="brand">{article.categoryName ?? article.category}</Badge>
 <h2 className="mt-2 font-semibold text-slate-900">{article.title}</h2>
 <p className="mt-1 text-xs text-slate-500">
 Submitted {formatDate(article.createdAt)}
@@ -52,7 +52,7 @@ View published article →
 )}
 </div>
 <aside>
-<NewsSubmitForm userId={user.id} />
+<NewsSubmitForm userId={user.id} categories={categories} />
 </aside>
 </div>
 </>

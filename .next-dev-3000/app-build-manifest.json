@@ -36,25 +36,25 @@
       "static/chunks/main-app.js",
       "static/chunks/app/dashboard/page.js"
     ],
-    "/messages/page": [
+    "/admin/layout": [
       "static/chunks/webpack.js",
       "static/chunks/main-app.js",
-      "static/chunks/app/messages/page.js"
+      "static/chunks/app/admin/layout.js"
     ],
-    "/places/page": [
+    "/admin/page": [
       "static/chunks/webpack.js",
       "static/chunks/main-app.js",
-      "static/chunks/app/places/page.js"
+      "static/chunks/app/admin/page.js"
     ],
-    "/api/auth/refresh/route": [
+    "/admin/places/page": [
       "static/chunks/webpack.js",
       "static/chunks/main-app.js",
-      "static/chunks/app/api/auth/refresh/route.js"
+      "static/chunks/app/admin/places/page.js"
     ],
-    "/blood-donation/page": [
+    "/admin/news/page": [
       "static/chunks/webpack.js",
       "static/chunks/main-app.js",
-      "static/chunks/app/blood-donation/page.js"
+      "static/chunks/app/admin/news/page.js"
     ]
   }
 }

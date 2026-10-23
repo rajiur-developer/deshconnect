@@ -1,0 +1,27 @@
+import { redirect } from "next/navigation";
+import { CategoryManager } from "@/components/admin/category-manager";
+import { PageHeader } from "@/components/layout/page-header";
+import { requireUser } from "@/lib/auth/current-user";
+import { listContentCategories } from "@/services/content-categories";
+
+export const metadata = { title: "Content categories" };
+
+export default async function AdminCategoriesPage() {
+  const user = await requireUser("/admin/categories");
+  if (user.role !== "admin") redirect("/admin");
+
+  const [placeCategories, newsCategories] = await Promise.all([
+    listContentCategories("place"),
+    listContentCategories("news"),
+  ]);
+
+  return (
+    <>
+      <PageHeader
+        title="Content categories"
+        description="Manage the categories available in the Places and News sections."
+      />
+      <CategoryManager placeCategories={placeCategories} newsCategories={newsCategories} />
+    </>
+  );
+}

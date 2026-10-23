@@ -1,6 +1,6 @@
 // @ts-nocheck
 import type { Metadata } from "next";
-import { PLACE_CATEGORIES } from "@/lib/constants"; import { buildHref, firstParam, parseSort } from "@/lib/query"; import { parsePage } from "@/lib/utils"; import { listPlaces } from "@/services/places"; import { getDirectoryLocationOptions } from "@/services/locations"; import { DirectoryFilters } from "@/components/search/directory-filters"; import { PlaceCard } from "@/components/cards/place-card"; import { EmptyState } from "@/components/ui/empty-state"; import { Pagination } from "@/components/ui/pagination"; import { PageBanner } from "@/components/layout/page-banner"; import { ListGrid } from "@/components/layout/list-grid"; import { Icon } from "@/components/ui/icons";
+import { buildHref, firstParam, parseSort } from "@/lib/query"; import { parsePage } from "@/lib/utils"; import { listPlaces } from "@/services/places"; import { listContentCategories } from "@/services/content-categories"; import { getDirectoryLocationOptions } from "@/services/locations"; import { DirectoryFilters } from "@/components/search/directory-filters"; import { PlaceCard } from "@/components/cards/place-card"; import { EmptyState } from "@/components/ui/empty-state"; import { Pagination } from "@/components/ui/pagination"; import { PageBanner } from "@/components/layout/page-banner"; import { ListGrid } from "@/components/layout/list-grid"; import { Icon } from "@/components/ui/icons";
 export const metadata: Metadata = { title: "Places to visit" };
 export default async function PlacesPage({
 searchParams, }: {
@@ -18,9 +18,10 @@ category: firstParam(params.category),
 sort: parseSort(params.sort),
 page: parsePage(firstParam(params.page)),
 };
-const [{ items, meta }, options] = await Promise.all([
+const [{ items, meta }, options, categories] = await Promise.all([
 listPlaces(query),
 getDirectoryLocationOptions(),
+listContentCategories("place"),
 ]);
 return (
 <>
@@ -36,7 +37,7 @@ params={params}
 divisions={options.divisions}
 districts={options.districts}
 upazilas={options.upazilas}
-categories={PLACE_CATEGORIES.map((category) => ({ value: category.value, label: category.label }))}
+categories={categories.map((category) => ({ value: category.value, label: category.name }))}
 showCategory
 current={{ divisionId, districtId, upazilaId }}
 />

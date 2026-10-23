@@ -1,13 +1,6 @@
 // @ts-nocheck
 import type { Metadata } from "next";
-import { buildHref, firstParam, parseSort } from "@/lib/query"; import { parsePage } from "@/lib/utils"; import { listNews } from "@/services/news"; import { DirectoryFilters } from "@/components/search/directory-filters"; import { NewsCard } from "@/components/cards/news-card"; import { EmptyState } from "@/components/ui/empty-state"; import { Pagination } from "@/components/ui/pagination"; import { PageBanner } from "@/components/layout/page-banner"; import { Icon } from "@/components/ui/icons"; import { getDirectoryLocationOptions } from "@/services/locations";
-const CATEGORIES = [
-{ value: "national", label: "National" },
-{ value: "district", label: "District" },
-{ value: "health", label: "Health" },
-{ value: "education", label: "Education" },
-{ value: "sports", label: "Sports" },
-{ value: "community", label: "Community" }, ];
+import { buildHref, firstParam, parseSort } from "@/lib/query"; import { parsePage } from "@/lib/utils"; import { listNews } from "@/services/news"; import { listContentCategories } from "@/services/content-categories"; import { DirectoryFilters } from "@/components/search/directory-filters"; import { NewsCard } from "@/components/cards/news-card"; import { EmptyState } from "@/components/ui/empty-state"; import { Pagination } from "@/components/ui/pagination"; import { PageBanner } from "@/components/layout/page-banner"; import { Icon } from "@/components/ui/icons"; import { getDirectoryLocationOptions } from "@/services/locations";
 export const metadata: Metadata = { title: "News" };
 export default async function NewsPage({
 searchParams, }: {
@@ -25,7 +18,7 @@ category: firstParam(params.category),
 sort: parseSort(params.sort),
 page: parsePage(firstParam(params.page)),
 };
-const [result, options] = await Promise.all([listNews(query), getDirectoryLocationOptions()]);
+const [result, options, categories] = await Promise.all([listNews(query), getDirectoryLocationOptions(), listContentCategories("news")]);
 return (
 <>
 <PageBanner
@@ -40,7 +33,7 @@ params={params}
 divisions={options.divisions}
 districts={options.districts}
 upazilas={options.upazilas}
-categories={CATEGORIES}
+categories={categories.map((category) => ({ value: category.value, label: category.name }))}
 showCategory
 sortOptions={["relevance", "name", "newest"]}
 icon="globe"

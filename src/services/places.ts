@@ -3,6 +3,7 @@ import "server-only";
 
 import { insforgeGet, insforgeInsert, insforgeUpdate, insforgeDelete, insforgeDeleteWhere, insforgeSelectOne, insforgeSelectMany } from "@/lib/insforge";
 import { addTextSearch, makePageMeta } from "@/lib/insforge-query";
+import { listContentCategories } from "@/services/content-categories";
 
 export async function insforgeListPlaces(query: {
   q?: string;
@@ -26,13 +27,18 @@ export async function insforgeListPlaces(query: {
   params["limit"] = pageSize.toString();
   params["order"] = query.sort === "name" ? "name.asc" : query.sort === "newest" ? "created_at.desc" : query.sort === "rating" ? "rating.desc" : "created_at.desc";
 
-  const { data, count } = await insforgeSelectMany("places", params);
+  const [{ data, count }, categories] = await Promise.all([
+    insforgeSelectMany("places", params),
+    listContentCategories("place"),
+  ]);
+  const categoryNames = new Map(categories.map((category) => [category.value, category.name]));
   return {
     items: (data || []).map((r: any) => ({
       id: r.id,
       slug: r.slug,
       name: r.name,
       category: r.category,
+      categoryName: categoryNames.get(r.category) ?? r.category,
       summary: r.summary,
       description: r.description,
       address: r.address,
@@ -62,11 +68,14 @@ export async function insforgeListPlaces(query: {
 export async function insforgeGetPlaceBySlug(slug: string) {
   const data = await insforgeSelectOne("places", { slug: `eq.${slug}`, status: "eq.published" });
   if (!data) return null;
+  const categories = await listContentCategories("place");
+  const categoryName = categories.find((category) => category.value === data.category)?.name ?? data.category;
   return {
     id: data.id,
     slug: data.slug,
     name: data.name,
     category: data.category,
+    categoryName,
     summary: data.summary,
     description: data.description,
     address: data.address,
@@ -136,5 +145,7 @@ export async function placesByDivision(divisionId: string, limit = 6) {
 export async function listSavedPlaces(userId: string) {
   const { data } = await insforgeSelectMany("saved_places", { user_id: `eq.${userId}` });
   const places = await Promise.all(data.map((row: any) => insforgeSelectOne("places", { id: `eq.${row.place_id}`, status: "eq.published" }).catch(() => null)));
-  return places.filter(Boolean).map((row: any) => ({ id: row.id, slug: row.slug, name: row.name, category: row.category, summary: row.summary, description: row.description, address: row.address, image: row.image, rating: row.rating, reviewCount: row.review_count, divisionId: row.division_id, districtId: row.district_id, upazilaId: row.upazila_id }));
+  const categories = await listContentCategories("place");
+  const categoryNames = new Map(categories.map((category) => [category.value, category.name]));
+  return places.filter(Boolean).map((row: any) => ({ id: row.id, slug: row.slug, name: row.name, category: row.category, categoryName: categoryNames.get(row.category) ?? row.category, summary: row.summary, description: row.description, address: row.address, image: row.image, rating: row.rating, reviewCount: row.review_count, divisionId: row.division_id, districtId: row.district_id, upazilaId: row.upazila_id }));
 }

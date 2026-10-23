@@ -1,7 +1,7 @@
 {
-  "/messages/page": "app/messages/page.js",
-  "/blood-donation/page": "app/blood-donation/page.js",
   "/dashboard/page": "app/dashboard/page.js",
   "/login/page": "app/login/page.js",
-  "/places/page": "app/places/page.js"
+  "/admin/news/page": "app/admin/news/page.js",
+  "/admin/page": "app/admin/page.js",
+  "/admin/places/page": "app/admin/places/page.js"
 }

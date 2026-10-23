@@ -8,6 +8,7 @@ const NAV = [
 { href: "/admin/permissions", label: "Permissions" },
 { href: "/admin/locations", label: "Locations" },
 { href: "/admin/places", label: "Places" },
+{ href: "/admin/categories", label: "Content Categories" },
 { href: "/admin/tourism", label: "Tourism" },
 { href: "/admin/businesses", label: "Businesses" },
 { href: "/admin/government-services", label: "Government Services" },
@@ -42,7 +43,7 @@ return (
 <div className="container-x grid gap-6 py-6 lg:grid-cols-5">
 <aside className="lg:col-span-1">
 <nav className="rounded-2xl border border-slate-200 bg-white p-2 lg:sticky lg:top-20" aria-label="Admin">
-{NAV.filter((item) => user.role === "admin" || item.href !== "/admin/permissions").map((item) => (
+{NAV.filter((item) => user.role === "admin" || !["/admin/permissions", "/admin/categories"].includes(item.href)).map((item) => (
 <Link key={item.href} href={item.href} className="block rounded-lg px-3 py-2 text-sm text-slate-700 hover:bg-slate-100">
 {item.label}
 </Link>

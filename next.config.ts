@@ -19,7 +19,7 @@ const inlinePort = process.argv.find((arg) => arg.startsWith("--port="))?.slice(
 const devPort = process.env.PORT ?? inlinePort ?? portFlagValue ?? "3000";
 
 const nextConfig: NextConfig = {
-  ...(process.env.NODE_ENV === "development" ? { distDir: `.next-dev-${devPort}` } : {}),
+  ...(process.env.NODE_ENV === "development" ? { distDir: `.next-dev/${devPort}` } : {}),
   experimental: {
     cpus: 1,
   },

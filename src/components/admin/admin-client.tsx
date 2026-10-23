@@ -18,9 +18,10 @@ adminSetUserRoleAction,
 deleteBusinessAction,
 toggleModeratorAction, } from "@/features/admin/actions"; import { ALL_ACTIONS, ROLE_LABELS } from "@/config/permissions"; import { Button } from "@/components/ui/button"; import type { Role } from "@/types/auth";
 import { rolePermissions } from "@/lib/auth/permissions";
+import type { ContentCategory } from "@/services/content-categories";
 const selectClass = "rounded-lg border border-slate-300 bg-white px-2 py-1 text-xs focus-ring";
 type FormState = { error?: string; success?: string };
-export function NewsStatusButtons({ article }: { article: { id: string; status: string; title: string; excerpt: string; body: string; category: string; source?: string | null; image: string } }) {
+export function NewsStatusButtons({ article, categories }: { article: { id: string; status: string; title: string; excerpt: string; body: string; category: string; source?: string | null; image: string }; categories: ContentCategory[] }) {
 const [pending, startTransition] = useTransition();
 const [editing, setEditing] = useState(false);
 const [message, setMessage] = useState("");
@@ -72,7 +73,7 @@ return (
 {editing && <form onSubmit={saveEdit} className="w-72 space-y-2 rounded-lg border border-slate-200 bg-slate-50 p-3">
 <label className="block text-xs font-medium text-slate-700">Title<input name="title" required maxLength={200} defaultValue={article.title} className="mt-1 w-full rounded border border-slate-300 bg-white px-2 py-1.5 text-sm" /></label>
 <label className="block text-xs font-medium text-slate-700">Excerpt<input name="excerpt" required maxLength={300} defaultValue={article.excerpt} className="mt-1 w-full rounded border border-slate-300 bg-white px-2 py-1.5 text-sm" /></label>
-<label className="block text-xs font-medium text-slate-700">Category<select name="category" required defaultValue={article.category} className="mt-1 w-full rounded border border-slate-300 bg-white px-2 py-1.5 text-sm">{["national", "district", "health", "education", "sports", "community"].map((category) => <option key={category} value={category}>{category}</option>)}</select></label>
+<label className="block text-xs font-medium text-slate-700">Category<select name="category" required defaultValue={article.category} className="mt-1 w-full rounded border border-slate-300 bg-white px-2 py-1.5 text-sm">{categories.map((category) => <option key={category.value} value={category.value}>{category.name}</option>)}</select></label>
 <label className="block text-xs font-medium text-slate-700">Article<textarea name="body" required defaultValue={article.body} rows={6} className="mt-1 w-full rounded border border-slate-300 bg-white px-2 py-1.5 text-sm" /></label>
 <label className="block text-xs font-medium text-slate-700">Source (optional)<input name="source" defaultValue={article.source ?? ""} className="mt-1 w-full rounded border border-slate-300 bg-white px-2 py-1.5 text-sm" /></label>
 <input type="hidden" name="image" value={article.image} />

@@ -5,22 +5,16 @@ import {
 adminUpdatePlaceAction,
 createPlaceAction,
 type AdminFormState, } from "@/features/admin/actions"; import { Button } from "@/components/ui/button"; import { Field, Input, Textarea } from "@/components/ui/input"; import { LocationFields } from "@/components/forms/location-fields"; import { ImageUpload } from "@/components/forms/image-upload"; import { useFormStateToast } from "@/components/ui/toast"; import type { DistrictOption, LocationOption, UpazilaOption } from "@/components/search/directory-filters"; import type { Place } from "@/types/content";
-const CATEGORIES = [
-{ value: "heritage", label: "Heritage" },
-{ value: "beach", label: "Beach & Sea" },
-{ value: "hill", label: "Hills & Trekking" },
-{ value: "forest", label: "Forest & Wildlife" },
-{ value: "river", label: "Rivers & Wetlands" },
-{ value: "park", label: "Parks & Nature" },
-{ value: "city", label: "City Highlights" }, ];
+import type { ContentCategory } from "@/services/content-categories";
 const selectClass = "w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm focus-ring";
 type Props = {
 divisions: LocationOption[];
 districts: DistrictOption[];
 upazilas: UpazilaOption[];
+categories: ContentCategory[];
 /** When provided the form edits this record instead of creating one. */
 record?: Place; };
-export function PlaceForm({ divisions, districts, upazilas, record }: Props) {
+export function PlaceForm({ divisions, districts, upazilas, categories, record }: Props) {
 const action = record ? adminUpdatePlaceAction : createPlaceAction;
 const [state, formAction, pending] = useActionState<AdminFormState, FormData>(
 action as unknown as (prev: AdminFormState, fd: FormData) => Promise<AdminFormState>,
@@ -47,8 +41,8 @@ return (
 <Field label="Category" htmlFor="place-category" required>
 <select id="place-category" name="category" required defaultValue={record?.category ?? ""} className={selectClass}>
 <option value="">Select category</option>
-{CATEGORIES.map((category) => (
-<option key={category.value} value={category.value}>{category.label}</option>
+{categories.map((category) => (
+<option key={category.value} value={category.value}>{category.name}</option>
 ))}
 </select>
 </Field>

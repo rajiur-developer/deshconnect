@@ -2,14 +2,8 @@
 "use client";
 import { useActionState } from "react";
 import { createNewsAction, type AdminFormState } from "@/features/admin/actions"; import { Button } from "@/components/ui/button"; import { Field, Input, Textarea } from "@/components/ui/input"; import { ImageUpload } from "@/components/forms/image-upload"; import { useFormStateToast } from "@/components/ui/toast";
-const CATEGORIES = [
-{ value: "national", label: "National" },
-{ value: "district", label: "District" },
-{ value: "health", label: "Health" },
-{ value: "education", label: "Education" },
-{ value: "sports", label: "Sports" },
-{ value: "community", label: "Community" }, ];
-export function StaffNewsForm() {
+import type { ContentCategory } from "@/services/content-categories";
+export function StaffNewsForm({ categories }: { categories: ContentCategory[] }) {
 const [state, formAction, pending] = useActionState<AdminFormState, FormData>(
 createNewsAction as unknown as (prev: AdminFormState, fd: FormData) => Promise<AdminFormState>,
 {}
@@ -28,8 +22,8 @@ return (
 <Field label="Category" htmlFor="staff-category" required>
 <select id="staff-category" name="category" required className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm focus-ring">
 <option value="">Select category</option>
-{CATEGORIES.map((category) => (
-<option key={category.value} value={category.value}>{category.label}</option>
+{categories.map((category) => (
+<option key={category.value} value={category.value}>{category.name}</option>
 ))}
 </select>
 </Field>

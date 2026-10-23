@@ -5,6 +5,7 @@ import { requireUser } from "@/lib/auth/current-user"; import { can, rolePermiss
 import { cookies } from "next/headers";
 import { createServerClient } from "@insforge/sdk/ssr";
 import { getRolePermissionOverrides, saveRolePermissionOverrides } from "@/services/role-permissions";
+import { isContentCategory, type ContentCategorySection } from "@/services/content-categories";
 export type AdminFormState = { error?: string; success?: string };
 async function guard(action: PermissionAction, redirectTo = "/admin") {
 const user = await requireUser(redirectTo);
@@ -27,6 +28,95 @@ const { data, error } = await client.database.from(table).update({ ...values, up
 if (error) throw error;
 return data;
 }
+async function requireMainAdmin() {
+const user = await requireUser("/admin/categories");
+if (user.role !== "admin") throw new Error("Only the main admin can manage categories.");
+return user;
+}
+function categorySectionFromForm(formData: FormData): ContentCategorySection | null {
+const section = formData.get("section");
+return section === "place" || section === "news" ? section : null;
+}
+export async function createContentCategoryAction(_prev: AdminFormState, formData: FormData): Promise<AdminFormState> {
+const user = await requireMainAdmin();
+const section = categorySectionFromForm(formData);
+const name = String(formData.get("name") ?? "").trim();
+if (!section || name.length < 1 || name.length > 80) return { error: "Enter a category name between 1 and 80 characters." };
+const client = createServerClient({ cookies: await cookies() });
+const value = createId("category");
+const { data, error } = await client.database.from("content_categories")
+.insert([{ section, value, name: sanitizeText(name, 80) }])
+.select("value").maybeSingle();
+if (error) {
+console.error("Content category creation failed", { code: error.code, message: error.message });
+return { error: error.code === "23505" ? "A category with this name already exists in this section." : "Could not add the category. Please try again." };
+}
+if (!data) return { error: "The category could not be confirmed as saved." };
+try { await audit(user, `category:${section}:create`, "content_category", value); } catch (error) { console.error("Category added but audit logging failed.", error); }
+revalidatePath("/admin/categories");
+revalidatePath("/admin/places");
+revalidatePath("/admin/tourism");
+revalidatePath("/admin/news");
+revalidatePath("/places");
+revalidatePath("/news");
+revalidatePath("/my-news");
+return { success: "Category added." };
+}
+export async function updateContentCategoryAction(_prev: AdminFormState, formData: FormData): Promise<AdminFormState> {
+const user = await requireMainAdmin();
+const section = categorySectionFromForm(formData);
+const value = String(formData.get("value") ?? "");
+const name = String(formData.get("name") ?? "").trim();
+if (!section || !value || name.length < 1 || name.length > 80) return { error: "Enter a category name between 1 and 80 characters." };
+const client = createServerClient({ cookies: await cookies() });
+const { data, error } = await client.database.from("content_categories")
+.update({ name: sanitizeText(name, 80), updated_at: new Date().toISOString() })
+.eq("section", section).eq("value", value).select("value").maybeSingle();
+if (error) {
+console.error("Content category update failed", { code: error.code, message: error.message });
+return { error: error.code === "23505" ? "A category with this name already exists in this section." : "Could not update the category. Please try again." };
+}
+if (!data) return { error: "Category not found." };
+try { await audit(user, `category:${section}:update`, "content_category", value); } catch (error) { console.error("Category updated but audit logging failed.", error); }
+revalidatePath("/admin/categories");
+revalidatePath("/admin/places");
+revalidatePath("/admin/tourism");
+revalidatePath("/admin/news");
+revalidatePath("/places");
+revalidatePath("/news");
+revalidatePath("/my-news");
+return { success: "Category updated." };
+}
+export async function deleteContentCategoryAction(_prev: AdminFormState, formData: FormData): Promise<AdminFormState> {
+const user = await requireMainAdmin();
+const section = categorySectionFromForm(formData);
+const value = String(formData.get("value") ?? "");
+if (!section || !value) return { error: "Invalid category." };
+const table = section === "place" ? "places" : "news";
+const client = createServerClient({ cookies: await cookies() });
+const { data: uses, error: usesError } = await client.database.from(table).select("id").eq("category", value).limit(1);
+if (usesError) {
+console.error("Could not check category usage before delete", { section, code: usesError.code, message: usesError.message });
+return { error: "Could not check whether this category is in use." };
+}
+if (uses?.length) return { error: "This category is used by existing content and cannot be deleted." };
+const { data, error } = await client.database.from("content_categories").delete()
+.eq("section", section).eq("value", value).select("value").maybeSingle();
+if (error) {
+console.error("Content category deletion failed", { code: error.code, message: error.message });
+return { error: "Could not delete the category. Please try again." };
+}
+if (!data) return { error: "Category not found." };
+try { await audit(user, `category:${section}:delete`, "content_category", value); } catch (error) { console.error("Category deleted but audit logging failed.", error); }
+revalidatePath("/admin/categories");
+revalidatePath("/admin/places");
+revalidatePath("/admin/tourism");
+revalidatePath("/admin/news");
+revalidatePath("/places");
+revalidatePath("/news");
+revalidatePath("/my-news");
+return { success: "Category deleted." };
+}
 export async function adminSetNewsStatusAction(id: string, status: "pending_review" | "published" | "rejected" | "archived"): Promise<{ ok: boolean; error?: string }> {
 const user = await guard("news:publish");
 if (!id || !["pending_review", "published", "rejected", "archived"].includes(status)) return { ok: false, error: "Invalid news update." };
@@ -46,6 +136,7 @@ category: formData.get("category"), source: formData.get("source") || undefined,
 image: formData.get("image") || undefined,
 });
 if (!parsed.success) return { ok: false, error: formatZodError(parsed.error) };
+if (!(await isContentCategory("news", parsed.data.category))) return { ok: false, error: "Please choose a valid news category." };
 const client = createServerClient({ cookies: await cookies() });
 const { data, error } = await client.database.from("news").update({
 title: sanitizeText(parsed.data.title, 200), excerpt: sanitizeText(parsed.data.excerpt, 300),
@@ -199,6 +290,7 @@ districtId: formData.get("districtId") || undefined,
 upazilaId: formData.get("upazilaId") || undefined,
 });
 if (!parsed.success) return { error: formatZodError(parsed.error) };
+if (!(await isContentCategory("place", parsed.data.category))) return { error: "Please choose a valid place category." };
 const now = new Date().toISOString();
 const place = {
 slug: `${slugify(parsed.data.name) || "place"}-${createId("place").slice(-8)}`,
@@ -258,6 +350,7 @@ source: formData.get("source") || undefined,
 image: formData.get("image") || undefined,
 });
 if (!parsed.success) return { error: formatZodError(parsed.error) };
+if (!(await isContentCategory("news", parsed.data.category))) return { error: "Please choose a valid news category." };
 const now = new Date().toISOString();
 const article: News = {
 id: createId("news"),
@@ -486,6 +579,7 @@ districtId: formData.get("districtId") || undefined,
 upazilaId: formData.get("upazilaId") || undefined,
 });
 if (!parsed.success) return { error: formatZodError(parsed.error) };
+if (!(await isContentCategory("place", parsed.data.category))) return { error: "Please choose a valid place category." };
 const updated = await updateAdminRow("places", id, { name: sanitizeText(parsed.data.name, 200), slug: slugify(parsed.data.name), category: parsed.data.category, summary: sanitizeText(parsed.data.summary, 10_000), description: sanitizeMultiline(parsed.data.description), address: sanitizeText(parsed.data.address, 300), opening_hours: parsed.data.openingHours ?? null, entry_fee: parsed.data.entryFee ?? null, best_time: parsed.data.bestTime ?? null, ...(parsed.data.image ? { image: parsed.data.image } : {}), division_id: parsed.data.divisionId ?? null, district_id: parsed.data.districtId ?? null, upazila_id: parsed.data.upazilaId ?? null });
 if (!updated) return { error: "Place not found." };
 await audit(user, "place:update", "place", id);

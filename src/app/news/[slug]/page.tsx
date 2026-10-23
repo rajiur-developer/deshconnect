@@ -33,7 +33,7 @@ return (
 <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }} />
 <div className="container-x py-8">
 <div className="mx-auto max-w-3xl">
-<Badge tone="brand">{article.category}</Badge>
+<Badge tone="brand">{article.categoryName ?? article.category}</Badge>
 <h1 className="mt-3 text-3xl font-bold text-slate-900">{article.title}</h1>
 <div className="mt-3 flex flex-wrap items-center gap-3 text-sm text-slate-600">
 <span className="flex items-center gap-1">

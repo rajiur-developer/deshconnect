@@ -2161,6 +2161,9 @@
     .hover\:text-red-700:hover {
       color: var(--color-red-700);
     }
+    .hover\:text-red-800:hover {
+      color: var(--color-red-800);
+    }
     .hover\:text-slate-800:hover {
       color: var(--color-slate-800);
     }
@@ -2295,6 +2298,9 @@
     }
     .sm\:items-center {
       align-items: center;
+    }
+    .sm\:items-end {
+      align-items: flex-end;
     }
     .sm\:p-5 {
       padding: calc(var(--spacing) * 5);
