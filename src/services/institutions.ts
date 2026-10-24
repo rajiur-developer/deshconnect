@@ -2,6 +2,30 @@
 import "server-only";
 import { insforgeGet, insforgeInsert, insforgeUpdate, insforgeDelete, insforgeSelectOne, insforgeSelectMany } from "@/lib/insforge";
 import { addTextSearch, makePageMeta } from "@/lib/insforge-query";
+export async function insforgeListAdminInstitutions(query: {
+categories: string[];
+q?: string;
+page?: number;
+pageSize?: number;
+}) {
+const pageSize = query.pageSize ?? 50;
+const requestedPage = Math.max(1, query.page ?? 1);
+const params: Record<string, string> = {
+category: `in.(${query.categories.join(",")})`,
+order: "updated_at.desc,id.asc",
+offset: ((requestedPage - 1) * pageSize).toString(),
+limit: pageSize.toString(),
+};
+addTextSearch(params, query.q, ["name", "address", "description"]);
+let result = await insforgeSelectMany("institutions", params);
+const meta = makePageMeta(result.count, requestedPage, pageSize);
+if (meta.page !== requestedPage) {
+params.offset = ((meta.page - 1) * pageSize).toString();
+result = await insforgeSelectMany("institutions", params);
+}
+return { items: result.data ?? [], meta: { ...meta, pageSize } };
+}
+
 export async function insforgeListInstitutions(query: {
 q?: string;
 divisionId?: string;

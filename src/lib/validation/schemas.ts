@@ -153,6 +153,20 @@ export const placeSchema = z.object({
   districtId: z.string().optional().transform(v => v === "" ? undefined : v),
   upazilaId: z.string().optional().transform(v => v === "" ? undefined : v),
 });
+export const institutionSchema = z.object({
+  name: z.string().trim().min(2).max(200),
+  category: z.enum(["school", "college", "madrasah", "hospital", "health-centre"]),
+  description: z.string().trim().min(1).max(10000),
+  address: z.string().trim().min(1).max(300),
+  phone: z.string().trim().max(50).optional(),
+  email: z.string().trim().max(200).optional(),
+  website: z.string().trim().max(200).optional(),
+  emergencyPhone: z.string().trim().max(50).optional(),
+  image: z.string().optional(),
+  divisionId: z.string().optional().transform(v => v === "" ? undefined : v),
+  districtId: z.string().optional().transform(v => v === "" ? undefined : v),
+  upazilaId: z.string().optional().transform(v => v === "" ? undefined : v),
+});
 export const staffNewsSchema = newsSchema;
 export const emergencyAlertSchema = z.object({
   bloodGroup: bloodGroup,

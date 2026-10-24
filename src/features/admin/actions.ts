@@ -1,12 +1,12 @@
 // @ts-nocheck
 "use server";
 import { revalidatePath } from "next/cache";
-import { requireUser } from "@/lib/auth/current-user"; import { can, rolePermissions } from "@/lib/auth/permissions"; import { ALL_ACTIONS, type PermissionAction } from "@/config/permissions"; import { setNewsStatus } from "@/services/news"; import { setPostStatus, setReportStatus, setReviewStatus } from "@/services/community"; import { setUserRole, setUserStatus } from "@/services/users"; import { setBloodRequestStatus } from "@/services/blood"; import { recordAudit } from "@/services/audit"; import { createId, slugify } from "@/lib/utils"; import { formatZodError, emergencyAlertSchema, businessSchema, locationSchema, placeSchema, serviceSchema, staffNewsSchema } from "@/lib/validation/schemas"; import { sanitizeMultiline, sanitizeText } from "@/lib/security/sanitize"; import type { Business, GovernmentService, News, Place } from "@/types/content"; import type { Role } from "@/types/auth";
+import { requireUser } from "@/lib/auth/current-user"; import { can, rolePermissions } from "@/lib/auth/permissions"; import { ALL_ACTIONS, type PermissionAction } from "@/config/permissions"; import { setNewsStatus } from "@/services/news"; import { setPostStatus, setReportStatus, setReviewStatus } from "@/services/community"; import { setUserRole, setUserStatus } from "@/services/users"; import { setBloodRequestStatus } from "@/services/blood"; import { recordAudit } from "@/services/audit"; import { createId, slugify } from "@/lib/utils"; import { formatZodError, emergencyAlertSchema, businessSchema, institutionSchema, locationSchema, placeSchema, serviceSchema, staffNewsSchema } from "@/lib/validation/schemas"; import { sanitizeMultiline, sanitizeText } from "@/lib/security/sanitize"; import type { Business, GovernmentService, News, Place } from "@/types/content"; import type { Role } from "@/types/auth";
 import { cookies } from "next/headers";
 import { createServerClient } from "@insforge/sdk/ssr";
 import { getRolePermissionOverrides, saveRolePermissionOverrides } from "@/services/role-permissions";
 import { isContentCategory, type ContentCategorySection } from "@/services/content-categories";
-import { isValidAdminPlaceImageUrl } from "@/features/admin/place-image";
+import { isValidAdminDirectoryImageUrl, isValidAdminPlaceImageUrl } from "@/features/admin/place-image";
 export type AdminFormState = { error?: string; success?: string };
 async function guard(action: PermissionAction, redirectTo = "/admin") {
 const user = await requireUser(redirectTo);
@@ -273,6 +273,15 @@ if (!deleted) return { ok: false, error: "Place not found." };
 await audit(user, "place:delete", "place", id);
 revalidatePath("/admin/places");
 revalidatePath("/places"); }
+export async function adminDeleteInstitutionAction(id: string) {
+const user = await guard("institutions:edit");
+const deleted = await deleteAdminRow("institutions", id);
+if (!deleted) return { ok: false, error: "Institution not found." };
+await audit(user, "institution:delete", "institution", id);
+revalidatePath("/admin/institutions");
+revalidatePath("/admin/hospitals");
+revalidatePath("/institutions");
+revalidatePath("/hospitals"); }
 export async function adminSaveSettingsAction(_prev: { error?: string; success?: string }, formData: FormData) {
 const user = await guard("settings:manage");
 const siteName = String(formData.get("siteName") ?? "").trim();
@@ -375,6 +384,69 @@ console.error("Place was created but audit logging failed", error);
 revalidatePath("/admin/places");
 revalidatePath("/places");
 return { success: "Place created and published." }; }
+/** Create a published hospital or educational institution. */
+export async function adminCreateInstitutionAction(_prev: AdminFormState, formData: FormData): Promise<AdminFormState> {
+const user = await guard("institutions:edit");
+const parsed = institutionSchema.safeParse({
+name: formData.get("name"),
+category: formData.get("category"),
+description: formData.get("description"),
+address: formData.get("address"),
+phone: formData.get("phone") || undefined,
+email: formData.get("email") || undefined,
+website: formData.get("website") || undefined,
+emergencyPhone: formData.get("emergencyPhone") || undefined,
+image: formData.get("image") || undefined,
+divisionId: formData.get("divisionId") || undefined,
+districtId: formData.get("districtId") || undefined,
+upazilaId: formData.get("upazilaId") || undefined,
+});
+if (!parsed.success) return { error: formatZodError(parsed.error) };
+if (parsed.data.image && !isValidAdminDirectoryImageUrl(parsed.data.image, user.id, "institutions")) {
+return { error: "The selected institution image could not be verified. Please upload it again." };
+}
+const slug = `${slugify(parsed.data.name) || "institution"}-${createId("institution").slice(-8)}`;
+const client = createServerClient({ cookies: await cookies() });
+let created;
+try {
+const result = await client.database.from("institutions").insert([{
+slug,
+name: sanitizeText(parsed.data.name, 200),
+category: parsed.data.category,
+description: sanitizeMultiline(parsed.data.description),
+address: sanitizeText(parsed.data.address, 300),
+phone: parsed.data.phone ? sanitizeText(parsed.data.phone, 50) : null,
+email: parsed.data.email ? sanitizeText(parsed.data.email, 200) : null,
+website: parsed.data.website ? sanitizeText(parsed.data.website, 200) : null,
+emergency_phone: parsed.data.emergencyPhone ? sanitizeText(parsed.data.emergencyPhone, 50) : null,
+image: parsed.data.image || "/images/places/p1.svg",
+verification: "verified",
+status: "published",
+division_id: parsed.data.divisionId ?? null,
+district_id: parsed.data.districtId ?? null,
+upazila_id: parsed.data.upazilaId ?? null,
+}]).select("id").single();
+if (result.error) {
+console.error("Institution creation failed", { code: result.error.code, message: result.error.message });
+return { error: "Institution could not be saved. Please try again." };
+}
+created = result.data;
+} catch (error) {
+console.error("Institution creation request failed", error);
+return { error: "Institution could not be saved. Please try again." };
+}
+if (!created?.id) return { error: "Institution could not be saved because the database returned no record." };
+try {
+await audit(user, "institution:create", "institution", created.id);
+} catch (error) {
+console.error("Institution was created but audit logging failed", error);
+}
+revalidatePath("/admin/institutions");
+revalidatePath("/admin/hospitals");
+revalidatePath("/institutions");
+revalidatePath("/hospitals");
+return { success: "Institution created and published." };
+}
 /** Publish a news article directly. Available to admins and moderators. */ export async function createNewsAction(_prev: AdminFormState, formData: FormData): Promise<AdminFormState> {
 const user = await guard("news:publish");
 const parsed = staffNewsSchema.safeParse({
@@ -576,6 +648,16 @@ await audit(user, `place:${status}`, "place", id);
 revalidatePath("/admin/places");
 revalidatePath("/admin/tourism");
 revalidatePath("/places"); }
+/** Hide (archive) or restore an institution. Admin and moderators with institution access. */
+export async function adminSetInstitutionStatusAction(id: string, status: "published" | "archived") {
+const user = await guard("institutions:edit");
+const updated = await updateAdminRow("institutions", id, { status });
+if (!updated) return { ok: false, error: "Institution not found." };
+await audit(user, `institution:${status}`, "institution", id);
+revalidatePath("/admin/institutions");
+revalidatePath("/admin/hospitals");
+revalidatePath("/institutions");
+revalidatePath("/hospitals"); }
 /** Hide (archive) or restore a business. Admin and moderators. */ export async function adminSetBusinessStatusAction(id: string, status: "published" | "archived") {
 const user = await guard("businesses:edit");
 const updated = await updateAdminRow("businesses", id, { status });
@@ -633,6 +715,57 @@ revalidatePath("/admin/places");
 revalidatePath("/admin/tourism");
 revalidatePath("/places");
 return { success: "Place updated." }; }
+/** Update an existing hospital or educational institution. */
+export async function adminUpdateInstitutionAction(_prev: AdminFormState, formData: FormData): Promise<AdminFormState> {
+const user = await guard("institutions:edit");
+const id = String(formData.get("id") ?? "");
+const imageChanged = formData.get("imageChanged") === "true";
+const parsed = institutionSchema.safeParse({
+name: formData.get("name"),
+category: formData.get("category"),
+description: formData.get("description"),
+address: formData.get("address"),
+phone: formData.get("phone") || undefined,
+email: formData.get("email") || undefined,
+website: formData.get("website") || undefined,
+emergencyPhone: formData.get("emergencyPhone") || undefined,
+image: formData.get("image") || undefined,
+divisionId: formData.get("divisionId") || undefined,
+districtId: formData.get("districtId") || undefined,
+upazilaId: formData.get("upazilaId") || undefined,
+});
+if (!parsed.success) return { error: formatZodError(parsed.error) };
+if (imageChanged && parsed.data.image && !isValidAdminDirectoryImageUrl(parsed.data.image, user.id, "institutions")) {
+return { error: "The selected institution image could not be verified. Please upload it again." };
+}
+let updated;
+try {
+updated = await updateAdminRow("institutions", id, {
+name: sanitizeText(parsed.data.name, 200),
+category: parsed.data.category,
+description: sanitizeMultiline(parsed.data.description),
+address: sanitizeText(parsed.data.address, 300),
+phone: parsed.data.phone ? sanitizeText(parsed.data.phone, 50) : null,
+email: parsed.data.email ? sanitizeText(parsed.data.email, 200) : null,
+website: parsed.data.website ? sanitizeText(parsed.data.website, 200) : null,
+emergency_phone: parsed.data.emergencyPhone ? sanitizeText(parsed.data.emergencyPhone, 50) : null,
+...(imageChanged ? { image: parsed.data.image || "/images/places/p1.svg" } : {}),
+division_id: parsed.data.divisionId ?? null,
+district_id: parsed.data.districtId ?? null,
+upazila_id: parsed.data.upazilaId ?? null,
+});
+} catch (error) {
+console.error("Institution update failed.", error instanceof Error ? error.message : "Unknown error");
+return { error: "Could not save this institution. Please try again." };
+}
+if (!updated) return { error: "Institution not found." };
+await audit(user, "institution:update", "institution", id);
+revalidatePath("/admin/institutions");
+revalidatePath("/admin/hospitals");
+revalidatePath("/institutions");
+revalidatePath("/hospitals");
+return { success: "Institution updated." };
+}
 /** Update an existing business. Admin and moderators. */ export async function adminUpdateBusinessAction(_prev: AdminFormState, formData: FormData): Promise<AdminFormState> {
 const user = await guard("businesses:edit");
 const id = String(formData.get("id") ?? "");

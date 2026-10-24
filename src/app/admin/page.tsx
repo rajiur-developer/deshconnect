@@ -3,10 +3,11 @@ import Link from "next/link";
 import { insforgeSelectMany } from "@/lib/insforge"; import { listAdminUsers } from "@/services/users"; import { listAuditLogs } from "@/services/audit"; import { listNews } from "@/services/news"; import { formatDate } from "@/lib/utils"; import { Badge, Card } from "@/components/ui/badge"; import { PageHeader } from "@/components/layout/page-header";
 export const metadata = { title: "Admin Dashboard" };
 export default async function AdminDashboardPage() {
-const [users, logs, newsResult, places, institutions, businesses, reports, donors, requests] = await Promise.all([
+const [users, logs, newsResult, places, institutions, hospitals, businesses, reports, donors, requests] = await Promise.all([
 listAdminUsers(), listAuditLogs(10), listNews({ includeAll: true, page: 1, pageSize: 500 }),
 insforgeSelectMany("places", { limit: "1" }).then((r) => r.count),
-insforgeSelectMany("institutions", { limit: "1" }).then((r) => r.count),
+insforgeSelectMany("institutions", { category: "in.(school,college,madrasah)", limit: "1" }).then((r) => r.count),
+insforgeSelectMany("institutions", { category: "in.(hospital,health-centre)", limit: "1" }).then((r) => r.count),
 insforgeSelectMany("businesses", { limit: "1" }).then((r) => r.count),
 insforgeSelectMany("reports", { status: "eq.open", limit: "1" }).then((r) => r.count),
 insforgeSelectMany("blood_donors", { limit: "1" }).then((r) => r.count),
@@ -18,7 +19,8 @@ const counts = [
 { label: "Users", value: users.length, href: "/admin/users" },
 { label: "Moderators", value: moderators.length, href: "/admin/users" },
 { label: "Places", value: places, href: "/admin/places" },
-{ label: "Institutions", value: institutions, href: "/admin/places" },
+{ label: "Institutions", value: institutions, href: "/admin/institutions" },
+{ label: "Hospitals", value: hospitals, href: "/admin/hospitals" },
 { label: "Businesses", value: businesses, href: "/admin/businesses" },
 { label: "News", value: news.length, href: "/admin/news?view=all" },
 { label: "Pending news", value: news.filter((item) => item.status === "pending_review").length, href: "/admin/news?view=requests" },

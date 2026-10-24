@@ -22,6 +22,7 @@ export function MobileNav({
   initialUnreadMessages?: UnreadConversation[];
 }) {
   const [open, setOpen] = useState(false);
+  const [openGroup, setOpenGroup] = useState<string | null>(null);
   const routeReady = useSyncExternalStore(subscribeToHydration, () => true, () => false);
   const pathname = usePathname();
   const unreadTotal = useUnreadMessageTotal(initialUnreadMessages);
@@ -68,24 +69,40 @@ export function MobileNav({
           <nav className="container-x flex flex-col gap-1 py-4">
             {PRIMARY_NAV.filter((entry) => isNavGroup(entry) || (entry.href !== "/blood-donation" && entry.href !== "/messages")).map((entry) => {
               if (isNavGroup(entry)) {
+                const isExpanded = openGroup === entry.label;
+                const isGroupActive = routeReady && entry.items.some((item) => isNavPathActive(pathname, item.href));
                 return (
-                  <div key={entry.label} className="px-3 py-1">
-                    <p className="text-xs font-semibold uppercase tracking-wide text-slate-400">{entry.label}</p>
-                    <div className="mt-1 flex flex-col gap-1">
-                      {entry.items.map((item) => {
-                        const isActive = routeReady && isNavPathActive(pathname, item.href);
-                        return (
-                          <Link
-                            key={item.href}
-                            href={item.href}
-                            aria-current={isActive ? "page" : undefined}
-                            className={`rounded-lg py-2 pl-4 pr-3 text-sm font-medium ${isActive ? "bg-brand-50 text-brand-700" : "text-slate-700 hover:bg-slate-100"}`}
-                          >
-                            {item.label}
-                          </Link>
-                        );
-                      })}
-                    </div>
+                  <div key={entry.label}>
+                    <button
+                      type="button"
+                      onClick={() => setOpenGroup((current) => current === entry.label ? null : entry.label)}
+                      aria-expanded={isExpanded}
+                      className={`flex w-full items-center justify-between rounded-lg px-3 py-2 text-left text-xs font-semibold uppercase tracking-wide ${isGroupActive ? "bg-brand-50 text-brand-700" : "text-slate-400 hover:bg-slate-50"}`}
+                    >
+                      {entry.label}
+                      <Icon
+                        name="chevron-down"
+                        aria-hidden="true"
+                        className={`h-4 w-4 transition-transform ${isExpanded ? "rotate-180" : ""}`}
+                      />
+                    </button>
+                    {isExpanded && (
+                      <div className="mt-1 flex flex-col gap-1">
+                        {entry.items.map((item) => {
+                          const isActive = routeReady && isNavPathActive(pathname, item.href);
+                          return (
+                            <Link
+                              key={item.href}
+                              href={item.href}
+                              aria-current={isActive ? "page" : undefined}
+                              className={`rounded-lg py-2 pl-6 pr-3 text-sm font-medium ${isActive ? "bg-brand-50 text-brand-700" : "text-slate-700 hover:bg-slate-100"}`}
+                            >
+                              {item.label}
+                            </Link>
+                          );
+                        })}
+                      </div>
+                    )}
                   </div>
                 );
               }

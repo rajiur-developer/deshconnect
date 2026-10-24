@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it } from "vitest";
-import { isValidAdminPlaceImageUrl } from "@/features/admin/place-image";
+import { isValidAdminDirectoryImageUrl, isValidAdminPlaceImageUrl } from "@/features/admin/place-image";
 
 describe("admin place image URLs", () => {
   afterEach(() => {
@@ -28,5 +28,20 @@ describe("admin place image URLs", () => {
       "admin-1",
     )).toBe(false);
     expect(isValidAdminPlaceImageUrl("data:image/jpeg;base64,abc", "admin-1")).toBe(false);
+  });
+
+  it("accepts institution images only from the current admin's institution folder", () => {
+    process.env.NEXT_PUBLIC_INSFORGE_URL = "https://backend.example";
+
+    expect(isValidAdminDirectoryImageUrl(
+      "https://backend.example/api/storage/buckets/community-post-images/objects/admin-1%2Finstitutions%2Fimage.jpg",
+      "admin-1",
+      "institutions",
+    )).toBe(true);
+    expect(isValidAdminDirectoryImageUrl(
+      "https://backend.example/api/storage/buckets/community-post-images/objects/admin-1%2Fplaces%2Fimage.jpg",
+      "admin-1",
+      "institutions",
+    )).toBe(false);
   });
 });

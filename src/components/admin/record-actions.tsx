@@ -3,21 +3,23 @@
 import { useState, useTransition, type ReactNode } from "react"; import { useRouter } from "next/navigation";
 import {
 adminDeletePlaceAction,
+adminDeleteInstitutionAction,
 adminDeleteServiceAction,
 adminSetBusinessStatusAction,
+adminSetInstitutionStatusAction,
 adminSetPlaceStatusAction,
 adminSetServiceStatusAction,
 deleteBusinessAction, } from "@/features/admin/actions"; import { useToast } from "@/components/ui/toast";
 import { AnimatedDialog } from "@/components/ui/animated-dialog";
 /**
-* Hide / Update / Delete controls for a directory record. "Update" opens the
+* Hide / Edit / Delete controls for a directory record. "Edit" opens the
 * supplied edit form in a modal. Success and failure are shown as pop-ups.
 */ export function RecordActions({
 entity,
 id,
 status,
 children, }: {
-entity: "place" | "business" | "service";
+entity: "place" | "business" | "service" | "institution" | "hospital";
 id: string;
 status: string;
 children?: ReactNode; }) {
@@ -29,7 +31,11 @@ const hidden = status === "archived";
 const run = (promise: Promise<unknown>, message: string) =>
 startTransition(async () => {
 try {
-await promise;
+const result = await promise;
+if (result && typeof result === "object" && "ok" in result && result.ok === false) {
+error("error" in result && typeof result.error === "string" ? result.error : "That action failed.");
+return;
+}
 success(message);
 router.refresh();
 } catch (cause) {
@@ -43,7 +49,9 @@ entity === "place"
 ? adminSetPlaceStatusAction(id, next)
 : entity === "business"
 ? adminSetBusinessStatusAction(id, next)
-: adminSetServiceStatusAction(id, next);
+: entity === "service"
+? adminSetServiceStatusAction(id, next)
+: adminSetInstitutionStatusAction(id, next);
 run(promise, hidden ? "Record restored." : "Record hidden.");
 };
 const remove = () => {
@@ -52,7 +60,9 @@ entity === "place"
 ? adminDeletePlaceAction(id)
 : entity === "business"
 ? deleteBusinessAction(id)
-: adminDeleteServiceAction(id);
+: entity === "service"
+? adminDeleteServiceAction(id)
+: adminDeleteInstitutionAction(id);
 run(promise, "Record deleted.");
 };
 return (
@@ -72,7 +82,7 @@ disabled={pending}
 onClick={() => setEditing(true)}
 className="rounded-lg border border-slate-300 px-2 py-1 text-xs font-medium text-slate-700 hover:bg-slate-50 disabled:opacity-60"
 >
-Update
+Edit
 </button>
 <button
 type="button"

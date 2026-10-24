@@ -8,6 +8,8 @@ const NAV = [
 { href: "/admin/permissions", label: "Permissions" },
 { href: "/admin/locations", label: "Locations" },
 { href: "/admin/places", label: "Places" },
+{ href: "/admin/hospitals", label: "Hospitals" },
+{ href: "/admin/institutions", label: "Institutions" },
 { href: "/admin/categories", label: "Content Categories" },
 { href: "/admin/tourism", label: "Tourism" },
 { href: "/admin/businesses", label: "Businesses" },
