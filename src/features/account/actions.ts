@@ -62,6 +62,11 @@ return { error: "Could not save profile changes. Please try again." };
 if (hasNewAvatar && previousProfile?.avatar_key && previousProfile.avatar_key !== avatarKey) {
 await client.storage.from(PROFILE_IMAGE_BUCKET).remove(previousProfile.avatar_key);
 }
+revalidatePath("/profile");
+revalidatePath("/profile/edit");
+revalidatePath("/", "layout");
+revalidatePath(`/profile/${user.username}`);
+try {
 await recordAudit({
 actorId: user.id,
 actorName: parsed.data.fullName,
@@ -70,10 +75,10 @@ entity: "user",
 entityId: user.id,
 outcome: "success",
 });
-revalidatePath("/profile");
-revalidatePath("/profile/edit");
-revalidatePath("/", "layout");
-revalidatePath(`/profile/${user.username}`);
+} catch (error) {
+console.error("Profile updated, but its audit log could not be recorded.", error);
+return { success: "Profile updated, but the activity log could not be saved." };
+}
 return { success: "Profile updated." }; }
 export async function requestConnectionAction(username: string): Promise<{ ok: boolean; error?: string }> {
 const user = await requireUser();
